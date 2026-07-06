@@ -1,0 +1,235 @@
+{
+  "name": "AI Internal Linking — RankerMind",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "ail-webhook",
+      "name": "AIL Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        320
+      ],
+      "webhookId": "ai-internal-linking",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-internal-linking",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "ail-is-ping",
+      "name": "Is Ping?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        520,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.body?.action ?? $json.action }}",
+              "rightValue": "ping",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "ail-respond-pong",
+      "name": "Respond Pong",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        800,
+        180
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"ok\": true, \"message\": \"pong\" } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "ail-build-prompt",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const data = $input.first().json;\nconst b = (data && data.body) ? data.body : data;\nconst NL = String.fromCharCode(10);\nconst action = b.action || \"find_opportunities\";\nconst direction = b.direction || \"outbound\";\nconst model = (b.model && String(b.model).trim()) || \"llama3.1:8b\";\nfunction clip(s, n){ s = (s == null) ? \"\" : String(s); return s.length > n ? s.slice(0, n) + \"...\" : s; }\nlet system = \"\";\nlet user = \"\";\nif (action === \"audit\") {\n  system = \"You are an internal-linking auditor for SEO. You receive a JSON summary of a website internal link graph and a list of detected issues. Write a concise, prioritised report for a non-technical site owner: the few things to fix first, why each matters for SEO and user experience, and a concrete next step for each. Output ONLY valid JSON, no markdown fences, exactly this shape: \" + JSON.stringify({ narrative: \"string\" }) + \".\";\n  user = \"Audit summary JSON:\" + NL + JSON.stringify(b.summary || {}, null, 2);\n} else if (direction === \"inbound\") {\n  const rules = b.rules || {};\n  const maxLinks = rules.max_links || 5;\n  const minScore = (rules.min_score != null) ? rules.min_score : 0.6;\n  const tgt = b.source || {};\n  const cands = (b.candidates || []).slice(0, 40).map(function(c){ return { source_post_id: c.post_id, title: c.title, url: c.url, content: clip(c.content, 1800) }; });\n  system = \"You are an expert SEO internal-linking assistant working on INBOUND links. You are given one TARGET page (the page that should receive more internal links) and a set of CANDIDATE pages with excerpts of their body text. Your job: find phrases inside the CANDIDATE pages' text that are genuinely, topically about the TARGET page's subject, and propose linking those phrases to the target.\" + NL + \"Method: first summarise the TARGET page's core topic to yourself from its title, keywords and content. Then, for each candidate, only propose an anchor if the sentence around it is truly discussing the target page's topic — a shared keyword alone is NOT enough; the reader clicking that link must land on a page that directly continues what the sentence is about.\" + NL + \"Hard requirements: (a) anchor_text MUST be an exact, case-insensitive substring of that candidate's content excerpt; (b) context_sentence MUST be the sentence containing the anchor; (c) source_post_id MUST be one of the candidate ids, never invented; (d) at most \" + maxLinks + \" suggestions total, at most 1 per candidate page; (e) only include items with score >= \" + minScore + \" where score reflects how well the anchor's sentence topic matches the target page's topic; (f) skip navigation-like, heading-like or call-to-action text; (g) prefer descriptive natural phrases.\" + NL + \"Output ONLY valid JSON, no markdown fences, exactly this shape: \" + JSON.stringify({ opportunities: [{ source_post_id: 0, anchor_text: \"string\", context_sentence: \"string\", score: 0, reason: \"string\" }] }) + \".\";\n  user = \"TARGET PAGE (should receive inbound links)\" + NL + \"Title: \" + clip(tgt.title, 200) + NL + \"URL: \" + (tgt.url || \"\") + NL + \"Keywords: \" + JSON.stringify(tgt.keywords || []) + NL + NL + \"TARGET CONTENT (for understanding its topic):\" + NL + clip(tgt.content, 4000) + NL + NL + \"CANDIDATE SOURCE PAGES (JSON array with content excerpts):\" + NL + JSON.stringify(cands);\n} else {\n  const rules = b.rules || {};\n  const maxLinks = rules.max_links || 5;\n  const minScore = (rules.min_score != null) ? rules.min_score : 0.6;\n  const guidelines = (rules.guidelines || []).map(function(g, i){ return (i + 1) + \". \" + g; }).join(NL);\n  const existing = rules.existing_anchors || {};\n  const src = b.source || {};\n  const targets = (b.targets || []).slice(0, 120).map(function(t){ return { id: t.post_id, title: t.title, url: t.url, keywords: (t.keywords || []).slice(0, 8), summary: clip(t.summary, 300) }; });\n  system = \"You are an expert SEO internal-linking assistant. Given a SOURCE page and a CATALOGUE of other pages on the same website, propose contextual internal links FROM the source page TO the most relevant other pages.\" + NL + \"Method: for every candidate link, read the catalogue entry's title, keywords AND summary and ask: if a reader clicked this anchor, would the destination page directly continue the topic of the sentence the anchor sits in? Only propose the link if the answer is clearly yes. A shared word is NOT relevance — the destination page as a whole must be about what the sentence is about. When in doubt, leave it out; fewer, highly relevant links beat many weak ones.\" + NL + \"Rules you MUST follow:\" + NL + guidelines + NL + NL + \"Hard requirements: (a) anchor_text MUST be an exact, case-insensitive substring already present in the source content; (b) context_sentence MUST be the sentence from the source content that contains the anchor; (c) target_post_id and target_url MUST come from the catalogue, never invent them; (d) propose at most \" + maxLinks + \" distinct anchors; (e) only include items with score >= \" + minScore + \", where score measures how well the DESTINATION PAGE'S OVERALL TOPIC matches the anchor's sentence; (f) never map the same anchor to more than one destination unless offering alternatives, in which case output them as separate items for the SAME anchor; (g) avoid anchors that look like headings, navigation, or calls-to-action; (h) prefer descriptive natural anchors, never generic text like click here; (i) in the reason field, state specifically what topic the destination page covers and why the sentence is about that topic.\" + NL + \"Output ONLY valid JSON, no markdown fences, exactly this shape: \" + JSON.stringify({ opportunities: [{ anchor_text: \"string\", target_post_id: 0, target_url: \"string\", context_sentence: \"string\", score: 0, reason: \"string\" }] }) + \".\";\n  user = \"SOURCE PAGE\" + NL + \"Title: \" + clip(src.title, 200) + NL + \"URL: \" + (src.url || \"\") + NL + NL + \"SOURCE CONTENT:\" + NL + clip(src.content, 8000) + NL + NL + \"ALREADY-USED ANCHORS (anchor maps to url, keep consistent and avoid duplicating):\" + NL + JSON.stringify(existing) + NL + NL + \"LINK TARGET CATALOGUE (JSON array):\" + NL + JSON.stringify(targets);\n}\nreturn [{ json: { action: action, direction: direction, model: model, system: system, user: user } }];"
+      }
+    },
+    {
+      "id": "ail-ollama",
+      "name": "Ollama Generate",
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        420
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.model }}"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.user }}",
+              "role": "user"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "system": "={{ $json.system }}",
+          "temperature": 0.2,
+          "format": "json",
+          "think": false,
+          "num_ctx": 8192
+        }
+      }
+    },
+    {
+      "id": "ail-shape",
+      "name": "Shape Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        420
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first().json;\nlet action = \"find_opportunities\";\ntry { action = $(\"Build Prompt\").first().json.action || action; } catch (e) {}\nfunction pickString(o){\n  if (o == null) return \"\";\n  if (typeof o === \"string\") return o;\n  const c = [o.response, o.text, o.output, o.content, (o.message && o.message.content), (o.data && o.data.content), o.completion];\n  for (let i = 0; i < c.length; i++){ if (typeof c[i] === \"string\" && c[i].trim()) return c[i]; }\n  return \"\";\n}\nfunction parseJson(s){\n  if (!s) return null;\n  const t = String(s).trim();\n  try { return JSON.parse(t); } catch (e) {}\n  const a = t.indexOf(\"{\"); const b2 = t.lastIndexOf(\"}\");\n  if (a > -1 && b2 > a){ try { return JSON.parse(t.slice(a, b2 + 1)); } catch (e) {} }\n  const c = t.indexOf(\"[\"); const d = t.lastIndexOf(\"]\");\n  if (c > -1 && d > c){ try { return JSON.parse(t.slice(c, d + 1)); } catch (e) {} }\n  return null;\n}\nlet raw = item;\nif (!(item && (item.opportunities || item.narrative))) { raw = parseJson(pickString(item)) || {}; }\nif (action === \"audit\") {\n  let narrative = (typeof raw === \"string\") ? raw : (raw.narrative || raw.summary || \"\");\n  return [{ json: { narrative: String(narrative) } }];\n}\nlet opps = [];\nif (Array.isArray(raw)) opps = raw; else if (raw && Array.isArray(raw.opportunities)) opps = raw.opportunities;\nopps = opps.filter(function(o){ return o && o.anchor_text; }).map(function(o){\n  return { anchor_text: String(o.anchor_text), source_post_id: o.source_post_id ? Number(o.source_post_id) : 0, target_post_id: o.target_post_id ? Number(o.target_post_id) : 0, target_url: o.target_url || \"\", context_sentence: o.context_sentence || \"\", score: (o.score != null) ? Number(o.score) : 0.6, reason: o.reason || \"\" };\n});\nreturn [{ json: { opportunities: opps } }];"
+      }
+    },
+    {
+      "id": "ail-respond-result",
+      "name": "Respond Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1580,
+        420
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "ail-sticky",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        190,
+        130
+      ],
+      "parameters": {
+        "content": "## AI Internal Linking — RankerMind\nThis workflow powers the \"AI Internal Linking\" WordPress plugin.\n\nSetup:\n1. Open the Ollama Generate node and create/select an Ollama credential pointing at your Ollama base URL (e.g. http://host.docker.internal:11434).\n2. Pull the model named in the plugin settings (default llama3.1:8b) in Ollama.\n3. Activate the workflow and copy the production Webhook URL into the plugin Settings (same URL for Find and Audit).\n\nThe plugin owns all data; this workflow is a stateless processor.",
+        "color": 4,
+        "width": 1640,
+        "height": 440
+      }
+    }
+  ],
+  "connections": {
+    "AIL Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Ping?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Ping?": {
+      "main": [
+        [
+          {
+            "node": "Respond Pong",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Ollama Generate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Generate": {
+      "main": [
+        [
+          {
+            "node": "Shape Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {}
+}
