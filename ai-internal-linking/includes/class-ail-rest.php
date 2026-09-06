@@ -50,6 +50,12 @@ class AIL_REST {
 			'permission_callback' => $perm,
 		) );
 
+		register_rest_route( self::NS, '/pages/scan-targets', array(
+			'methods'             => 'GET',
+			'callback'            => array( $this, 'get_scan_targets' ),
+			'permission_callback' => $perm,
+		) );
+
 		register_rest_route( self::NS, '/sync', array(
 			'methods'             => 'POST',
 			'callback'            => array( $this, 'post_sync' ),
@@ -65,6 +71,12 @@ class AIL_REST {
 		register_rest_route( self::NS, '/opportunities', array(
 			'methods'             => 'GET',
 			'callback'            => array( $this, 'get_opportunities' ),
+			'permission_callback' => $perm,
+		) );
+
+		register_rest_route( self::NS, '/opportunities/all', array(
+			'methods'             => 'GET',
+			'callback'            => array( $this, 'get_all_opportunities' ),
 			'permission_callback' => $perm,
 		) );
 
@@ -198,6 +210,18 @@ class AIL_REST {
 		return rest_ensure_response( $result );
 	}
 
+	/**
+	 * Return a lightweight list of every published indexed page to scan.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function get_scan_targets() {
+		global $wpdb;
+		$table = AIL_DB::table( 'index' );
+		$rows  = $wpdb->get_results( "SELECT post_id, title FROM {$table} WHERE post_status = 'publish' AND sync_status = 'synced' ORDER BY title ASC", ARRAY_A ); // phpcs:ignore WordPress.DB
+		return rest_ensure_response( array( 'rows' => $rows ?: array(), 'total' => count( $rows ?: array() ) ) );
+	}
+
 	/* ----------------------------------------------------------------- *
 	 *  Sync
 	 * ----------------------------------------------------------------- */
@@ -286,6 +310,45 @@ class AIL_REST {
 		$post_id   = (int) $req->get_param( 'post_id' );
 		$direction = 'inbound' === $req->get_param( 'direction' ) ? 'inbound' : 'outbound';
 		return rest_ensure_response( $this->grouped_opportunities( $post_id, $direction ) );
+	}
+
+	/**
+	 * Return all currently suggested links for site-wide review.
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function get_all_opportunities() {
+		$rows            = AIL_DB::get_all_opportunities();
+		$out             = array();
+		$links_by_source = array();
+		foreach ( $rows as $row ) {
+			$source_id = (int) $row['source_post_id'];
+			$source    = get_post( $source_id );
+			if ( ! $source ) {
+				continue;
+			}
+			if ( ! isset( $links_by_source[ $source_id ] ) ) {
+				$links_by_source[ $source_id ] = AIL_Sync::extract_internal_links( $source );
+			}
+			$links = $links_by_source[ $source_id ];
+			if ( AIL_Sync::has_destination( $links, (int) $row['target_post_id'], $row['target_url'] ) || AIL_Sync::has_anchor( $links, $row['anchor_text'] ) ) {
+				AIL_DB::set_opportunity_status( (int) $row['id'], 'ignored' );
+				continue;
+			}
+			$out[] = array(
+				'id'               => (int) $row['id'],
+				'source_post_id'   => $source_id,
+				'source_title'     => get_the_title( $source_id ),
+				'target_post_id'   => (int) $row['target_post_id'],
+				'target_title'     => $row['target_title'],
+				'target_url'       => $row['target_url'],
+				'anchor_text'      => $row['anchor_text'],
+				'context_sentence' => $row['context_sentence'],
+				'score'            => round( (float) $row['score'], 2 ),
+				'reason'           => $row['reason'],
+			);
+		}
+		return rest_ensure_response( array( 'rows' => $out, 'count' => count( $out ) ) );
 	}
 
 	/**

@@ -246,6 +246,18 @@ button.ail-btn.ail-btn-sm.ail-btn-primary { margin: 1em 0; }
 @keyframes ail-indeterminate { 0% { margin-left: -32%; } 100% { margin-left: 102%; } }
 .ail-progress.is-determinate span { animation: none; transition: width .3s ease; }
 
+.ail-scan-panel { background: var(--ail-surface); border: 1px solid var(--ail-border); border-radius: var(--ail-radius); padding: 16px 18px; margin-bottom: 16px; }
+.ail-scan-panel strong { font-size: 14px; }
+.ail-scan-panel p { margin: 4px 0 0; color: var(--ail-text-faint); font-size: 12px; }
+.ail-scan-track { height: 7px; background: var(--ail-border); border-radius: 7px; overflow: hidden; margin-top: 13px; }
+.ail-scan-track span { display: block; height: 100%; background: var(--ail-grad); transition: width .25s ease; }
+.ail-bulk-head { position: sticky; top: 32px; z-index: 3; display: flex; align-items: center; gap: 14px; justify-content: flex-end; padding: 12px 16px; margin-bottom: 12px; background: var(--ail-surface); border: 1px solid var(--ail-border); border-radius: var(--ail-radius); box-shadow: var(--ail-shadow-sm); }
+.ail-bulk-head label { margin-right: auto; font-size: 12.5px; }
+.ail-bulk-head span { color: var(--ail-text-faint); font-size: 12.5px; }
+.ail-global-opps { display: grid; gap: 12px; }
+.ail-global-edit { display: block; margin-top: 10px; color: var(--ail-text-faint); font-size: 11px; font-weight: 650; text-transform: uppercase; }
+.ail-global-edit .ail-input { display: block; margin-top: 5px; max-width: 460px; text-transform: none; }
+
 .ail-loadstate { text-align: center; padding: 44px 20px; }
 .ail-loadstate .ail-orbit { width: 56px; height: 56px; margin: 0 auto 18px; position: relative; }
 .ail-loadstate .ail-orbit::before, .ail-loadstate .ail-orbit::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 3px solid transparent; }

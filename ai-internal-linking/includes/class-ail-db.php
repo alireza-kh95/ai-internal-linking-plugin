@@ -346,6 +346,24 @@ class AIL_DB {
 	}
 
 	/**
+	 * Get site-wide opportunities for the review queue.
+	 *
+	 * @param string $status Opportunity status.
+	 * @param int    $limit  Maximum rows.
+	 * @return array
+	 */
+	public static function get_all_opportunities( $status = 'suggested', $limit = 1000 ) {
+		global $wpdb;
+		$table = self::table( 'opportunities' );
+		$limit = max( 1, min( 5000, (int) $limit ) );
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY source_post_id ASC, anchor_text ASC, score DESC LIMIT %d", $status, $limit ), // phpcs:ignore WordPress.DB
+			ARRAY_A
+		);
+		return $rows ?: array();
+	}
+
+	/**
 	 * Get a single opportunity by id.
 	 *
 	 * @param int $id Opportunity id.

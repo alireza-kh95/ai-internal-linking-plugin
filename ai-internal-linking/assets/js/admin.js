@@ -117,12 +117,14 @@
 		route: 'dashboard',
 		postTypes: [],
 		pagesState: { search: '', status: '', type: '', orderby: 'updated_at', order: 'DESC', page: 1, per_page: 20 },
+		siteScan: null,
 		drawer: null
 	};
 
 	var NAV = [
 		{ id: 'dashboard', label: 'Dashboard', icon: I.grid },
 		{ id: 'pages', label: 'Pages', icon: I.pages },
+		{ id: 'opportunities', label: 'Opportunities', icon: I.sparkle },
 		{ id: 'links', label: 'Applied Links', icon: I.link },
 		{ id: 'audit', label: 'Audit', icon: I.audit },
 		{ id: 'settings', label: 'Settings', icon: I.settings },
@@ -184,6 +186,7 @@
 		var r = App.route;
 		if ( r === 'dashboard' ) { return viewDashboard(); }
 		if ( r === 'pages' ) { return viewPages(); }
+		if ( r === 'opportunities' ) { return viewAllOpportunities(); }
 		if ( r === 'links' ) { return viewLinks(); }
 		if ( r === 'audit' ) { return viewAudit(); }
 		if ( r === 'settings' ) { return viewSettings(); }
@@ -279,7 +282,7 @@
 		} ).join( '' );
 
 		App.view.innerHTML = pageHead( 'Pages', 'Every indexed page. Click "Find opportunities" to let the AI suggest contextual internal links.',
-			'<button class="ail-btn" id="p-sync">' + I.sync + 'Sync now</button>' ) +
+			'<button class="ail-btn" id="p-sync">' + I.sync + 'Sync now</button><button class="ail-btn ail-btn-primary" id="p-scan-all">' + I.sparkle + 'Scan all pages</button>' ) +
 			'<div class="ail-toolbar">' +
 				'<div class="ail-search">' + I.search + '<input class="ail-input" id="p-search" placeholder="Search pages…" value="' + attr( App.pagesState.search ) + '"></div>' +
 				'<select class="ail-select" id="p-type">' + typeOpts + '</select>' +
@@ -292,6 +295,7 @@
 			'<div id="p-body">' + loadingBlock() + '</div>';
 
 		qs( '#p-sync' ).addEventListener( 'click', runFullSync );
+		qs( '#p-scan-all' ).addEventListener( 'click', function () { go( 'opportunities' ); setTimeout( startSiteScan, 50 ); } );
 		var deb;
 		qs( '#p-search' ).addEventListener( 'input', function ( e ) {
 			clearTimeout( deb ); var v = e.target.value;
@@ -305,6 +309,80 @@
 			return;
 		}
 		loadPages();
+	}
+
+	/* ================================================================ *
+	 *  SITE-WIDE OPPORTUNITIES
+	 * ================================================================ */
+	function viewAllOpportunities() {
+		App.view.innerHTML = pageHead( 'Opportunities', 'Scan every page once, then review links from and to pages in one queue.',
+			'<button class="ail-btn ail-btn-primary" id="o-scan-all">' + I.sparkle + 'Scan all pages</button>' ) +
+			'<div id="o-progress"></div><div id="o-body">' + loadingBlock() + '</div>';
+		qs( '#o-scan-all' ).addEventListener( 'click', startSiteScan );
+		renderSiteScanProgress();
+		loadAllOpportunities();
+	}
+
+	function startSiteScan() {
+		if ( App.siteScan && App.siteScan.running ) { return; }
+		api( '/pages/scan-targets' ).then( function ( res ) {
+			if ( ! res.rows.length ) { toast( 'Sync your pages before running a site scan.', 'warn' ); return; }
+			App.siteScan = { running: true, cancelled: false, rows: res.rows, index: 0, found: 0, failed: [] };
+			renderSiteScanProgress();
+			runNextSiteScan();
+		} ).catch( function ( e ) { toast( e.message, 'err', 'Scan could not start' ); } );
+	}
+
+	function runNextSiteScan() {
+		var s = App.siteScan;
+		if ( ! s || s.cancelled || s.index >= s.rows.length ) {
+			if ( s ) { s.running = false; }
+			renderSiteScanProgress(); loadAllOpportunities();
+			if ( s && ! s.cancelled ) { toast( s.found + ' opportunities found across ' + s.rows.length + ' pages.', 'ok', 'Site scan complete' ); }
+			return;
+		}
+		var page = s.rows[ s.index ];
+		renderSiteScanProgress();
+		api( '/opportunities/find', { method: 'POST', body: { post_id: parseInt( page.post_id, 10 ), direction: 'outbound' } } )
+			.then( function ( res ) { s.found += parseInt( res.count || 0, 10 ); } )
+			.catch( function ( e ) { s.failed.push( { title: page.title, message: e.message } ); } )
+			.finally( function () { s.index++; renderSiteScanProgress(); loadAllOpportunities(); runNextSiteScan(); } );
+	}
+
+	function renderSiteScanProgress() {
+		var box = qs( '#o-progress' );
+		if ( ! box ) { return; }
+		var s = App.siteScan;
+		if ( ! s ) { box.innerHTML = ''; return; }
+		var total = s.rows.length, done = Math.min( s.index, total ), pct = total ? Math.round( done / total * 100 ) : 0;
+		var current = s.running && s.rows[ s.index ] ? 'Scanning “' + esc( s.rows[ s.index ].title ) + '”' : ( s.cancelled ? 'Scan stopped' : 'Scan complete' );
+		box.innerHTML = '<div class="ail-scan-panel"><div class="ail-spread"><div><strong>' + current + '</strong><p>' + done + ' of ' + total + ' pages · ' + s.found + ' opportunities · ' + s.failed.length + ' failed</p></div>' +
+			( s.running ? '<button class="ail-btn ail-btn-sm" id="o-cancel">Stop</button>' : '' ) + '</div><div class="ail-scan-track"><span style="width:' + pct + '%"></span></div></div>';
+		var cancel = qs( '#o-cancel' ); if ( cancel ) { cancel.addEventListener( 'click', function () { s.cancelled = true; s.running = false; renderSiteScanProgress(); } ); }
+	}
+
+	function loadAllOpportunities() {
+		var body = qs( '#o-body' ); if ( ! body ) { return; }
+		api( '/opportunities/all' ).then( function ( res ) {
+			if ( ! res.rows.length ) { body.innerHTML = emptyState( I.sparkle, 'No open opportunities', 'Run a site scan to analyse all indexed pages.' ); return; }
+			body.innerHTML = '<div class="ail-bulk-head"><label class="ail-flex"><input type="checkbox" id="o-all"> Select all</label><span id="o-count">0 selected</span><button class="ail-btn ail-btn-primary" id="o-apply" disabled>' + I.link + 'Apply links</button></div><div class="ail-global-opps">' + res.rows.map( function ( o ) {
+				return '<div class="ail-opp" data-oid="' + o.id + '"><div class="ail-opp-head"><input type="checkbox" class="ail-check" data-o-check><div class="ail-opp-main"><div class="ail-opp-anchor"><span class="ail-anchor-chip">' + esc( o.anchor_text ) + '</span><span class="ail-badge badge-gray">from: ' + esc( o.source_title ) + '</span></div><div class="ail-opp-context">…' + highlight( o.context_sentence, o.anchor_text ) + '…</div><div class="ail-cands"><div class="ail-cand is-chosen"><div class="ail-cand-body"><div class="ail-cand-title">' + esc( o.target_title || o.target_url ) + '<span class="ail-score" style="' + scoreColor( o.score ) + '">' + Math.round( o.score * 100 ) + '%</span></div><div class="ail-cand-url">' + esc( ( o.target_url || '' ).replace( /^https?:\/\//, '' ) ) + '</div>' + ( o.reason ? '<div class="ail-cand-reason">' + esc( o.reason ) + '</div>' : '' ) + '</div></div></div><label class="ail-global-edit">Linked phrase<input class="ail-input" data-o-anchor value="' + attr( o.anchor_text ) + '"></label></div></div></div>';
+			} ).join( '' ) + '</div>';
+			bindAllOpportunities( res.rows );
+		} ).catch( function ( e ) { body.innerHTML = errorBlock( e ); } );
+	}
+
+	function bindAllOpportunities( rows ) {
+		var body = qs( '#o-body' ), checks = qsa( '[data-o-check]', body );
+		function update() { var n = checks.filter( function ( c ) { return c.checked; } ).length; qs( '#o-count' ).textContent = n + ' selected'; qs( '#o-apply' ).disabled = ! n; }
+		checks.forEach( function ( c ) { c.addEventListener( 'change', function () { c.closest( '.ail-opp' ).classList.toggle( 'is-selected', c.checked ); update(); } ); } );
+		qs( '#o-all' ).addEventListener( 'change', function ( e ) { checks.forEach( function ( c ) { c.checked = e.target.checked; c.closest( '.ail-opp' ).classList.toggle( 'is-selected', c.checked ); } ); update(); } );
+		qs( '#o-apply' ).addEventListener( 'click', function () {
+			var selected = [];
+			checks.forEach( function ( c, i ) { if ( c.checked ) { var o = rows[ i ]; selected.push( { opportunity_id: o.id, anchor_text: qs( '[data-o-anchor]', c.closest( '.ail-opp' ) ).value.trim(), original_anchor: o.anchor_text, target_url: o.target_url, target_post_id: o.target_post_id, source_post_id: o.source_post_id } ); } } );
+			var btn = qs( '#o-apply' ); btn.disabled = true; btn.textContent = 'Applying…';
+			api( '/opportunities/apply', { method: 'POST', body: { post_id: selected[ 0 ].source_post_id, direction: 'outbound', items: selected } } ).then( function ( r ) { toast( r.applied + ' links applied.', 'ok' ); if ( r.failed.length ) { r.failed.forEach( function ( f ) { toast( f, 'warn' ); } ); } loadAllOpportunities(); } ).catch( function ( e ) { toast( e.message, 'err', 'Apply failed' ); loadAllOpportunities(); } );
+		} );
 	}
 
 	function sortTh( key, label ) {
