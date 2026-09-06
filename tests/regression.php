@@ -97,3 +97,35 @@ $updated = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
 verify( AIL_Content::save_acf_editor( 1, $updated[0], $html ), 'Undo must restore the exact nested field.' );
 echo "Passed 9 nested ACF editor checks.\n";
 
+define( 'MINUTE_IN_SECONDS', 60 );
+define( 'HOUR_IN_SECONDS', 3600 );
+function current_user_can( $capability ) { return $GLOBALS['can_update']; }
+function get_site_transient( $key ) { return $GLOBALS['transients'][ $key ] ?? false; }
+function set_site_transient( $key, $value, $ttl = 0 ) { $GLOBALS['transients'][ $key ] = $value; }
+function delete_site_transient( $key ) { unset( $GLOBALS['transients'][ $key ] ); }
+function wp_remote_get( $url, $args ) { ++$GLOBALS['requests']; return $GLOBALS['github_response']; }
+function is_wp_error( $response ) { return false; }
+function wp_remote_retrieve_response_code( $response ) { return $response['status']; }
+function wp_remote_retrieve_body( $response ) { return $response['body']; }
+$GLOBALS['can_update'] = true;
+$GLOBALS['requests'] = 0;
+$GLOBALS['transients'] = array( 'update_plugins' => (object) array( 'response' => array( 'other/plugin.php' => (object) array( 'new_version' => '9.0' ) ) ) );
+$release['assets'] = array( array( 'name' => 'ai-internal-linking.zip', 'state' => 'uploaded', 'browser_download_url' => 'https://github.com/alireza-kh95/ai-internal-linking-plugin/releases/download/v1.3.1/ai-internal-linking.zip' ) );
+$GLOBALS['github_response'] = array( 'status' => 200, 'body' => json_encode( $release ) );
+AIL_Updater::refresh_admin();
+verify( $GLOBALS['requests'] === 1, 'Opening update page must check GitHub once.' );
+$updates = get_site_transient( 'update_plugins' );
+verify( $updates->response[ AIL_PLUGIN_BASENAME ]->new_version === '1.3.1', 'New version must appear immediately in native update data.' );
+verify( isset( $updates->response['other/plugin.php'] ), 'Other plugin update entries must remain untouched.' );
+AIL_Updater::refresh_admin();
+verify( $GLOBALS['requests'] === 1, 'Repeated page loads within throttle must not request again.' );
+delete_site_transient( 'ail_update_page_checked' );
+$GLOBALS['can_update'] = false;
+AIL_Updater::refresh_admin();
+verify( $GLOBALS['requests'] === 1, 'Unauthorized visitors must not trigger checks.' );
+$GLOBALS['can_update'] = true;
+$GLOBALS['github_response']['status'] = 503;
+AIL_Updater::refresh_admin();
+verify( isset( get_site_transient( 'update_plugins' )->response[ AIL_PLUGIN_BASENAME ] ), 'GitHub failures must preserve known updates.' );
+echo "Passed 6 admin update checks.\n";
+

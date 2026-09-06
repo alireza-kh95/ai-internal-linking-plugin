@@ -6,7 +6,7 @@ WordPress plugin by Alireza Khosravani. Uses n8n and Ollama to suggest contextua
 
 Download `ai-internal-linking.zip` from the latest GitHub release. Upload it through WordPress **Plugins > Add New Plugin > Upload Plugin**. For an existing installation, choose **Replace current with uploaded**; do not delete the plugin first.
 
-Version 1.3.0 introduces the updater. Install it manually once. Later published releases appear on the standard Plugins and Dashboard Updates screens. WordPress controls check timing, and the GitHub response is cached for up to one hour. Routine commits do not trigger production updates until the plugin version is increased and a release is published.
+Version 1.3.0 introduces the updater. Install it manually once. From 1.3.2, opening Plugins or Dashboard Updates checks GitHub fresh, at most once per minute, and refreshes only this plugin's update entry. Scheduled checks retain an hourly cache. Routine commits do not trigger production updates until the plugin version is increased and a release is published.
 
 ## Publishing
 

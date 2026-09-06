@@ -13,6 +13,32 @@ class AIL_Updater {
 		add_filter( 'update_plugins_github.com', array( __CLASS__, 'check' ), 10, 4 );
 		add_filter( 'plugins_api', array( __CLASS__, 'information' ), 10, 3 );
 		add_action( 'upgrader_process_complete', array( __CLASS__, 'clear_cache' ), 10, 2 );
+		add_action( 'load-plugins.php', array( __CLASS__, 'refresh_admin' ) );
+		add_action( 'load-update-core.php', array( __CLASS__, 'refresh_admin' ) );
+	}
+
+	/** Refresh only this plugin's update entry, without rechecking other plugins. */
+	public static function refresh_admin() {
+		if ( ! current_user_can( 'update_plugins' ) || get_site_transient( 'ail_update_page_checked' ) ) {
+			return;
+		}
+		set_site_transient( 'ail_update_page_checked', 1, MINUTE_IN_SECONDS );
+		delete_site_transient( self::CACHE );
+		$update = self::check( false, array(), AIL_PLUGIN_BASENAME, array() );
+		if ( ! $update ) { return; }
+		$updates = get_site_transient( 'update_plugins' );
+		if ( ! is_object( $updates ) ) { $updates = new stdClass(); }
+		$updates->response = isset( $updates->response ) && is_array( $updates->response ) ? $updates->response : array();
+		$updates->no_update = isset( $updates->no_update ) && is_array( $updates->no_update ) ? $updates->no_update : array();
+		$update['plugin'] = AIL_PLUGIN_BASENAME;
+		$update['new_version'] = $update['version'];
+		unset( $updates->response[ AIL_PLUGIN_BASENAME ], $updates->no_update[ AIL_PLUGIN_BASENAME ] );
+		if ( version_compare( $update['version'], AIL_VERSION, '>' ) ) {
+			$updates->response[ AIL_PLUGIN_BASENAME ] = (object) $update;
+		} else {
+			$updates->no_update[ AIL_PLUGIN_BASENAME ] = (object) $update;
+		}
+		set_site_transient( 'update_plugins', $updates );
 	}
 
 	public static function release() {
