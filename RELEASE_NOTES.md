@@ -1,6 +1,6 @@
-Existing linked anchor phrases are now removed from saved suggestions, even when a stale suggestion points to a different destination.
+Fix a false ACF save warning that could appear after a nested rich-text link was successfully inserted.
 
-The check reads current post and nested ACF links whenever the opportunity drawer opens. Matching ignores case and whitespace. Applying a link also checks again to prevent duplicate anchors during concurrent edits.
+The plugin now verifies the exact nested ACF value after saving. ACF's false return value is accepted only when the requested HTML was actually persisted; genuine write failures still produce an error.
 
-Includes the nested ACF rich-text fix and prompt-side suppression of already-linked anchors. Opening Plugins checks for this release at most once per minute.
+Includes all existing-anchor suppression and nested ACF linking improvements from 1.3.3.
 

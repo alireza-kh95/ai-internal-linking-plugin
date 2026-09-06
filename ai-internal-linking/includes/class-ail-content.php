@@ -188,7 +188,16 @@ class AIL_Content {
 		if ( $leaf !== $field['html'] ) { return false; }
 		$leaf = $html;
 		unset( $leaf );
-		return (bool) update_field( $field['root_key'], $value, $post_id );
+		$saved = (bool) update_field( $field['root_key'], $value, $post_id );
+		if ( $saved ) { return true; }
+
+		// ACF may report false even after persisting a nested value. Verify the leaf.
+		$value = get_field( $field['root_key'], $post_id, false );
+		foreach ( $field['path'] as $key ) {
+			if ( ! is_array( $value ) || ! array_key_exists( $key, $value ) ) { return false; }
+			$value = $value[ $key ];
+		}
+		return is_string( $value ) && $value === $html;
 	}
 
 	/** Collect nested ACF HTML and link values, including flexible-content cards. */

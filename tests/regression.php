@@ -76,7 +76,11 @@ function get_field_objects( $id, $formatted ) {
 	) );
 }
 function get_field( $key, $id, $formatted ) { return $GLOBALS['editor_value']; }
-function update_field( $key, $value, $id ) { $GLOBALS['editor_value'] = $value; return true; }
+function update_field( $key, $value, $id ) {
+	if ( ! empty( $GLOBALS['discard_update'] ) ) { return false; }
+	$GLOBALS['editor_value'] = $value;
+	return $GLOBALS['update_result'];
+}
 class AIL_Settings { public static function get( $key ) { return ''; } }
 require __DIR__ . '/../ai-internal-linking/includes/class-ail-linker.php';
 $phrase = 'route every call to the team you already have';
@@ -85,6 +89,7 @@ $GLOBALS['editor_value'] = array(
 	array( 'acf_fc_layout' => 'hero', 'field_group' => array( 'field_body' => $html, 'field_plain' => 'Preserve this' ) ),
 	array( 'acf_fc_layout' => 'hero', 'group' => array( 'body' => '<p>Second row</p>', 'plain' => 'Also preserve' ) ),
 );
+$GLOBALS['update_result'] = true;
 $editors = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
 verify( count( $editors ) === 2, 'Nested rich-text fields must be found; plain-text fields must not be edited.' );
 verify( $editors[0]['path'] === array( 0, 'field_group', 'field_body' ), 'Key-based values must retain exact path.' );
@@ -99,7 +104,14 @@ verify( $GLOBALS['editor_value'][1]['group']['body'] === '<p>Second row</p>', 'N
 verify( ! AIL_Content::save_acf_editor( 1, $editors[0], '<p>Stale write</p>' ), 'Stale editor must not overwrite a newer value.' );
 $updated = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
 verify( AIL_Content::save_acf_editor( 1, $updated[0], $html ), 'Undo must restore the exact nested field.' );
-echo "Passed 9 nested ACF editor checks.\n";
+$updated = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
+$GLOBALS['update_result'] = false;
+verify( AIL_Content::save_acf_editor( 1, $updated[0], '<p>ACF saved this despite returning false.</p>' ), 'Persisted ACF value must count as saved even when update_field returns false.' );
+$updated = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
+$GLOBALS['discard_update'] = true;
+verify( ! AIL_Content::save_acf_editor( 1, $updated[0], '<p>This must fail.</p>' ), 'A genuinely failed ACF write must remain an error.' );
+$GLOBALS['discard_update'] = false;
+echo "Passed 11 nested ACF editor checks.\n";
 
 define( 'MINUTE_IN_SECONDS', 60 );
 define( 'HOUR_IN_SECONDS', 3600 );
