@@ -76,6 +76,15 @@ class AIL_N8N {
 				);
 			}
 			$payload['candidates'] = $candidates;
+			$payload['alternatives'] = array_map( function ( $t ) {
+				return array(
+					'post_id'  => (int) $t['post_id'],
+					'title'    => $t['title'],
+					'url'      => $t['url'],
+					'keywords' => json_decode( (string) $t['keywords'], true ) ?: array(),
+					'summary'  => $t['excerpt'],
+				);
+			}, AIL_DB::get_target_catalog( $post_id ) );
 		} else {
 			$targets = array();
 			foreach ( AIL_DB::get_target_catalog( $post_id ) as $t ) {
