@@ -353,5 +353,24 @@ class AIL_Sync {
 		}
 		return false;
 	}
+
+	/** Check whether an anchor phrase is already linked on a source page. */
+	public static function has_anchor( array $links, $anchor ) {
+		$anchor = self::anchor_key( $anchor );
+		if ( '' === $anchor ) {
+			return false;
+		}
+		foreach ( $links as $link ) {
+			if ( self::anchor_key( $link['anchor_text'] ?? '' ) === $anchor ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static function anchor_key( $anchor ) {
+		$anchor = html_entity_decode( wp_strip_all_tags( (string) $anchor ), ENT_QUOTES, 'UTF-8' );
+		return mb_strtolower( trim( (string) preg_replace( '/\s+/u', ' ', $anchor ) ), 'UTF-8' );
+	}
 }
 

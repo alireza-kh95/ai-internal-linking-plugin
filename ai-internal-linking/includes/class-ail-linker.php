@@ -64,6 +64,10 @@ class AIL_Linker {
 				continue;
 			}
 
+			if ( AIL_Sync::has_anchor( $existing_links, $anchor ) || AIL_Sync::has_anchor( $existing_links, $orig ) ) {
+				$failed[] = __( 'This anchor phrase is already linked on the page, including its ACF blocks.', 'ai-internal-linking' );
+				continue;
+			}
 			if ( AIL_Sync::has_destination( $existing_links, url_to_postid( $url ), $url ) ) {
 				$failed[] = __( 'This page already links to that destination, including its ACF blocks.', 'ai-internal-linking' );
 				continue;
@@ -78,7 +82,7 @@ class AIL_Linker {
 				$content = $result['content'];
 				++$applied;
 				$done[] = $item;
-				$existing_links[] = array( 'target_post_id' => url_to_postid( $url ), 'target_url' => $url );
+				$existing_links[] = array( 'target_post_id' => url_to_postid( $url ), 'target_url' => $url, 'anchor_text' => $anchor );
 				continue;
 			}
 
@@ -99,7 +103,7 @@ class AIL_Linker {
 					$placed               = true;
 					++$applied;
 					$done[] = $item;
-					$existing_links[] = array( 'target_post_id' => url_to_postid( $url ), 'target_url' => $url );
+					$existing_links[] = array( 'target_post_id' => url_to_postid( $url ), 'target_url' => $url, 'anchor_text' => $anchor );
 					break;
 				}
 			}

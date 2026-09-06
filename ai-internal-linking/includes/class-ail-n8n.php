@@ -103,7 +103,7 @@ class AIL_N8N {
 		if ( 'inbound' === $direction ) {
 			$opportunities = $this->normalise_inbound( $response, $payload['candidates'], $index );
 		} else {
-			$opportunities = $this->normalise_opportunities( $response, $payload['targets'], $index['content_text'] );
+			$opportunities = $this->normalise_opportunities( $response, $payload['targets'], $index['content_text'], $existing_links );
 		}
 		return array(
 			'opportunities' => $opportunities,
@@ -200,9 +200,10 @@ class AIL_N8N {
 	 * @param mixed  $response       Workflow response.
 	 * @param array  $targets        Target catalogue (post_id keyed lookups).
 	 * @param string $source_content Plain text of the source page, for anchor verification.
+	 * @param array  $existing_links Existing links found in the source page.
 	 * @return array
 	 */
-	protected function normalise_opportunities( $response, array $targets, $source_content = '' ) {
+	protected function normalise_opportunities( $response, array $targets, $source_content = '', array $existing_links = array() ) {
 		$list = $this->extract_list( $response );
 		if ( ! $list ) {
 			return array();
@@ -226,6 +227,9 @@ class AIL_N8N {
 			}
 			$anchor = isset( $o['anchor_text'] ) ? trim( (string) $o['anchor_text'] ) : '';
 			if ( '' === $anchor ) {
+				continue;
+			}
+			if ( AIL_Sync::has_anchor( $existing_links, $anchor ) ) {
 				continue;
 			}
 			// The anchor must genuinely exist in the source body, or it can never be applied.

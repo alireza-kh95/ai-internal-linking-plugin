@@ -308,7 +308,8 @@ class AIL_REST {
 				$source = get_post( $sid );
 				$existing_by_source[ $sid ] = $source ? AIL_Sync::extract_internal_links( $source ) : array();
 			}
-			if ( AIL_Sync::has_destination( $existing_by_source[ $sid ], (int) $r['target_post_id'], $r['target_url'] ) ) {
+			if ( AIL_Sync::has_destination( $existing_by_source[ $sid ], (int) $r['target_post_id'], $r['target_url'] ) || AIL_Sync::has_anchor( $existing_by_source[ $sid ], $r['anchor_text'] ) ) {
+				AIL_DB::set_opportunity_status( (int) $r['id'], 'ignored' );
 				continue;
 			}
 			$key = $inbound
@@ -346,7 +347,7 @@ class AIL_REST {
 			'direction' => $direction,
 			'post'      => AIL_DB::get_index_by_post( $post_id ),
 			'groups'    => array_values( $groups ),
-			'count'     => count( $rows ),
+			'count'     => array_sum( array_map( function ( $group ) { return count( $group['candidates'] ); }, $groups ) ),
 		);
 	}
 

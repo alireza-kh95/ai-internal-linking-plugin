@@ -1,8 +1,9 @@
 <?php
 // Standalone contract tests; WordPress integration is checked separately.
 define( 'ABSPATH', __DIR__ );
-define( 'AIL_VERSION', '1.3.0' );
+define( 'AIL_VERSION', '1.3.2' );
 define( 'AIL_PLUGIN_BASENAME', 'ai-internal-linking/ai-internal-linking.php' );
+if ( ! function_exists( 'mb_strtolower' ) ) { function mb_strtolower( $value, $encoding = null ) { return strtolower( $value ); } }
 class WP_Post { public $ID = 1; public $post_type = 'page'; public $post_content = ''; }
 class WP_Http {
 	public static function make_absolute_url( $url, $base ) {
@@ -21,6 +22,7 @@ function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $compon
 function url_to_postid( $url ) { return strpos( $url, '/service' ) !== false ? 2 : 0; }
 function wpautop( $html ) { return $html; }
 function do_shortcode( $html ) { return $html; }
+function wp_strip_all_tags( $html ) { return strip_tags( $html ); }
 function verify( $condition, $message ) {
 	if ( ! $condition ) { throw new RuntimeException( $message ); }
 }
@@ -45,12 +47,14 @@ verify( AIL_Sync::has_destination( $links, 0, 'https://example.com/other/#sectio
 verify( ! AIL_Sync::has_destination( $links, 0, 'https://example.com/new' ), 'New destinations must remain eligible.' );
 verify( ! AIL_Sync::has_destination( $links, 0, 'https://elsewhere.com/other' ), 'External host must not match.' );
 verify( ! AIL_Sync::has_destination( $links, 0, 'https://example.com/other?variant=1' ), 'Meaningful query strings must be preserved.' );
+verify( AIL_Sync::has_anchor( $links, "  READ\n more " ), 'Existing anchors must match case-insensitively across whitespace.' );
+verify( ! AIL_Sync::has_anchor( $links, 'route every call' ), 'Different anchors must remain eligible.' );
 
-$release = array( 'tag_name' => 'v1.3.1', 'draft' => false, 'prerelease' => false, 'body' => 'Changes', 'assets' => array( array(
+$release = array( 'tag_name' => 'v1.3.3', 'draft' => false, 'prerelease' => false, 'body' => 'Changes', 'assets' => array( array(
 	'name' => 'ai-internal-linking.zip', 'state' => 'uploaded',
-	'browser_download_url' => 'https://github.com/alireza-kh95/ai-internal-linking-plugin/releases/download/v1.3.1/ai-internal-linking.zip',
+	'browser_download_url' => 'https://github.com/alireza-kh95/ai-internal-linking-plugin/releases/download/v1.3.3/ai-internal-linking.zip',
 ) ) );
-verify( AIL_Updater::parse_release( $release )['version'] === '1.3.1', 'Stable versioned asset must be accepted.' );
+verify( AIL_Updater::parse_release( $release )['version'] === '1.3.3', 'Stable versioned asset must be accepted.' );
 $release['prerelease'] = true;
 verify( ! AIL_Updater::parse_release( $release ), 'Prereleases must not update production sites.' );
 $release['prerelease'] = false;
@@ -58,7 +62,7 @@ $release['assets'][0]['browser_download_url'] = 'https://elsewhere.com/plugin.zi
 verify( ! AIL_Updater::parse_release( $release ), 'Unexpected package URL must be rejected.' );
 $release['assets'] = array();
 verify( ! AIL_Updater::parse_release( $release ), 'Release without installable archive must not be offered.' );
-echo "Passed 11 regression checks.\n";
+echo "Passed 13 regression checks.\n";
 
 function get_field_objects( $id, $formatted ) {
 	return array( array( 'key' => 'field_blocks', 'name' => 'blocks', 'type' => 'flexible_content',
@@ -110,12 +114,12 @@ function wp_remote_retrieve_body( $response ) { return $response['body']; }
 $GLOBALS['can_update'] = true;
 $GLOBALS['requests'] = 0;
 $GLOBALS['transients'] = array( 'update_plugins' => (object) array( 'response' => array( 'other/plugin.php' => (object) array( 'new_version' => '9.0' ) ) ) );
-$release['assets'] = array( array( 'name' => 'ai-internal-linking.zip', 'state' => 'uploaded', 'browser_download_url' => 'https://github.com/alireza-kh95/ai-internal-linking-plugin/releases/download/v1.3.1/ai-internal-linking.zip' ) );
+$release['assets'] = array( array( 'name' => 'ai-internal-linking.zip', 'state' => 'uploaded', 'browser_download_url' => 'https://github.com/alireza-kh95/ai-internal-linking-plugin/releases/download/v1.3.3/ai-internal-linking.zip' ) );
 $GLOBALS['github_response'] = array( 'status' => 200, 'body' => json_encode( $release ) );
 AIL_Updater::refresh_admin();
 verify( $GLOBALS['requests'] === 1, 'Opening update page must check GitHub once.' );
 $updates = get_site_transient( 'update_plugins' );
-verify( $updates->response[ AIL_PLUGIN_BASENAME ]->new_version === '1.3.1', 'New version must appear immediately in native update data.' );
+verify( $updates->response[ AIL_PLUGIN_BASENAME ]->new_version === '1.3.3', 'New version must appear immediately in native update data.' );
 verify( isset( $updates->response['other/plugin.php'] ), 'Other plugin update entries must remain untouched.' );
 AIL_Updater::refresh_admin();
 verify( $GLOBALS['requests'] === 1, 'Repeated page loads within throttle must not request again.' );

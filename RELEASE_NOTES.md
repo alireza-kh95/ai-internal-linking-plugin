@@ -1,6 +1,6 @@
-Opening Plugins or Dashboard Updates now refreshes this plugin's GitHub release check, at most once per minute per site/network.
+Existing linked anchor phrases are now removed from saved suggestions, even when a stale suggestion points to a different destination.
 
-The refresh bypasses the hourly release cache and updates only this plugin's WordPress update entry. Other plugins are not rechecked. Standard scheduled WordPress checks continue to work.
+The check reads current post and nested ACF links whenever the opportunity drawer opens. Matching ignores case and whitespace. Applying a link also checks again to prevent duplicate anchors during concurrent edits.
 
-Includes the 1.3.1 nested ACF rich-text linking fix. If an older updater is still caching the release, install this ZIP using Replace current with uploaded once. No n8n workflow change is required.
+Includes the nested ACF rich-text fix and prompt-side suppression of already-linked anchors. Opening Plugins checks for this release at most once per minute.
 
