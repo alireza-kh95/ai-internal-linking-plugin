@@ -139,6 +139,46 @@ class AIL_Content {
 		return $out;
 	}
 
+	/** Collect nested ACF HTML and link values, including flexible-content cards. */
+	public static function acf_link_html( $post_id ) {
+		$parts = array();
+		if ( function_exists( 'get_fields' ) ) {
+			self::collect_link_html( get_fields( $post_id ), $parts );
+		}
+		return implode( "\n", $parts );
+	}
+
+	private static function collect_link_html( $value, array &$parts, $key = '', $depth = 0 ) {
+		if ( $depth > 20 ) {
+			return;
+		}
+		if ( $value instanceof WP_Post ) {
+			if ( 'attachment' !== $value->post_type ) {
+				$parts[] = '<a href="' . esc_url( get_permalink( $value ) ) . '">' . esc_html( get_the_title( $value ) ) . '</a>';
+			}
+			return;
+		}
+		if ( is_array( $value ) ) {
+			// Media URLs are assets, not links rendered by the page.
+			if ( isset( $value['mime_type'] ) || isset( $value['sizes'], $value['url'] ) ) {
+				return;
+			}
+			if ( isset( $value['url'], $value['title'] ) && is_string( $value['url'] ) ) {
+				$parts[] = '<a href="' . esc_url( $value['url'] ) . '">' . esc_html( $value['title'] ) . '</a>';
+				return;
+			}
+			foreach ( $value as $child_key => $child ) {
+				self::collect_link_html( $child, $parts, (string) $child_key, $depth + 1 );
+			}
+		} elseif ( is_string( $value ) ) {
+			if ( false !== stripos( $value, '<a' ) ) {
+				$parts[] = $value;
+			} elseif ( preg_match( '/(?:url|link|href|permalink)/i', $key ) && ! preg_match( '/(?:image|icon|file|thumbnail)/i', $key ) ) {
+				$parts[] = '<a href="' . esc_url( trim( $value ) ) . '"></a>';
+			}
+		}
+	}
+
 	/**
 	 * Word count of a plain-text string (multibyte aware).
 	 *
@@ -288,3 +328,4 @@ class AIL_Content {
 		return $set;
 	}
 }
+

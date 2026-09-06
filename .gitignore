@@ -1,0 +1,11 @@
+.DS_Store
+.idea/
+.claude/
+.codex/
+.env
+.env.*
+dist/
+*.log
+compose.yaml
+n8n-techvertu-config.yml
+

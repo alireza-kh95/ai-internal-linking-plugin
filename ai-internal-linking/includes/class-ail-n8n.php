@@ -34,6 +34,8 @@ class AIL_N8N {
 		}
 
 		$direction = 'inbound' === $direction ? 'inbound' : 'outbound';
+		$post = get_post( $post_id );
+		$existing_links = $post ? AIL_Sync::extract_internal_links( $post ) : array();
 
 		$payload = array(
 			'action'    => 'find_opportunities',
@@ -46,6 +48,7 @@ class AIL_N8N {
 				'url'     => $index['url'],
 				'content' => $index['content_text'],
 				'keywords' => json_decode( (string) $index['keywords'], true ) ?: array(),
+				'existing_links' => $existing_links,
 			),
 			'rules'     => array(
 				'max_links'        => (int) AIL_Settings::get( 'max_links' ),
@@ -58,17 +61,26 @@ class AIL_N8N {
 		if ( 'inbound' === $direction ) {
 			$candidates = array();
 			foreach ( AIL_DB::get_source_candidates( $post_id ) as $c ) {
+				$candidate_post = get_post( $c['post_id'] );
+				$candidate_links = $candidate_post ? AIL_Sync::extract_internal_links( $candidate_post ) : array();
+				if ( AIL_Sync::has_destination( $candidate_links, $post_id, $index['url'] ) ) {
+					continue;
+				}
 				$candidates[] = array(
 					'post_id' => (int) $c['post_id'],
 					'title'   => $c['title'],
 					'url'     => $c['url'],
 					'content' => $c['content'],
+					'existing_links' => $candidate_links,
 				);
 			}
 			$payload['candidates'] = $candidates;
 		} else {
 			$targets = array();
 			foreach ( AIL_DB::get_target_catalog( $post_id ) as $t ) {
+				if ( AIL_Sync::has_destination( $existing_links, $t['post_id'], $t['url'] ) ) {
+					continue;
+				}
 				$targets[] = array(
 					'post_id'  => (int) $t['post_id'],
 					'title'    => $t['title'],
@@ -80,6 +92,9 @@ class AIL_N8N {
 			$payload['targets'] = $targets;
 		}
 
+		if ( empty( 'inbound' === $direction ? $payload['candidates'] : $payload['targets'] ) ) {
+			return array( 'opportunities' => array(), 'raw' => array( 'opportunities' => array() ) );
+		}
 		$response = $this->request( $url, $payload );
 		if ( is_wp_error( $response ) ) {
 			return $response;
@@ -340,3 +355,4 @@ class AIL_N8N {
 		);
 	}
 }
+

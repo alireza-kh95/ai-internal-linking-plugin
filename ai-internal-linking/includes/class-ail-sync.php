@@ -296,10 +296,7 @@ class AIL_Sync {
 	 */
 	public static function extract_internal_links( $post ) {
 		$html = AIL_Content::rendered_html( $post );
-		// Include links that live inside ACF WYSIWYG fields.
-		foreach ( AIL_Content::acf_wysiwyg_fields( $post->ID ) as $field ) {
-			$html .= "\n" . $field['html'];
-		}
+		$html .= "\n" . AIL_Content::acf_link_html( $post->ID );
 		if ( '' === trim( $html ) ) {
 			return array();
 		}
@@ -307,18 +304,21 @@ class AIL_Sync {
 		$host   = wp_parse_url( $home, PHP_URL_HOST );
 		$result = array();
 
-		if ( ! preg_match_all( '#<a\b[^>]*href=("|\')(.*?)\1[^>]*>(.*?)</a>#is', $html, $m, PREG_SET_ORDER ) ) {
-			return array();
-		}
-		foreach ( $m as $match ) {
-			$href   = html_entity_decode( $match[2], ENT_QUOTES, 'UTF-8' );
-			$anchor = trim( wp_strip_all_tags( $match[3] ) );
+		$dom = new DOMDocument();
+		$previous = libxml_use_internal_errors( true );
+		$dom->loadHTML( '<?xml encoding="UTF-8">' . $html );
+		libxml_clear_errors();
+		libxml_use_internal_errors( $previous );
+		foreach ( $dom->getElementsByTagName( 'a' ) as $element ) {
+			$href   = trim( $element->getAttribute( 'href' ) );
+			$anchor = trim( $element->textContent );
 			if ( '' === $href || 0 === strpos( $href, '#' ) || 0 === stripos( $href, 'mailto:' ) || 0 === stripos( $href, 'tel:' ) ) {
 				continue;
 			}
 			// Normalise relative URLs.
-			if ( 0 === strpos( $href, '/' ) ) {
-				$href = $home . $href;
+			$href = WP_Http::make_absolute_url( $href, get_permalink( $post ) );
+			if ( ! in_array( strtolower( (string) wp_parse_url( $href, PHP_URL_SCHEME ) ), array( 'http', 'https' ), true ) ) {
+				continue;
 			}
 			$link_host = wp_parse_url( $href, PHP_URL_HOST );
 			if ( $link_host && $host && strtolower( $link_host ) !== strtolower( $host ) ) {
@@ -333,4 +333,25 @@ class AIL_Sync {
 		}
 		return $result;
 	}
+
+	/** Compare destinations independently of anchor text, fragments and trailing slashes. */
+	public static function destination_key( $url ) {
+		$url = WP_Http::make_absolute_url( html_entity_decode( (string) $url, ENT_QUOTES, 'UTF-8' ), home_url( '/' ) );
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) ) {
+			return '';
+		}
+		return strtolower( $parts['host'] ?? '' ) . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' ) . rtrim( $parts['path'] ?? '/', '/' ) . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
+	}
+
+	public static function has_destination( array $links, $post_id, $url ) {
+		$key = self::destination_key( $url );
+		foreach ( $links as $link ) {
+			if ( ( $post_id && (int) $link['target_post_id'] === (int) $post_id ) || ( '' !== $key && self::destination_key( $link['target_url'] ) === $key ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
 }
+

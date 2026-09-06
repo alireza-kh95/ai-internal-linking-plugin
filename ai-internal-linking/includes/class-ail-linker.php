@@ -54,6 +54,7 @@ class AIL_Linker {
 		$applied     = 0;
 		$failed      = array();
 		$done        = array();
+		$existing_links = AIL_Sync::extract_internal_links( $post );
 
 		foreach ( $items as $item ) {
 			$anchor = isset( $item['anchor_text'] ) ? trim( (string) $item['anchor_text'] ) : '';
@@ -61,6 +62,11 @@ class AIL_Linker {
 			$orig   = isset( $item['original_anchor'] ) ? trim( (string) $item['original_anchor'] ) : $anchor;
 			if ( '' === $anchor || '' === $url ) {
 				$failed[] = sprintf( __( 'Skipped an item with a missing anchor or URL.', 'ai-internal-linking' ) );
+				continue;
+			}
+
+			if ( AIL_Sync::has_destination( $existing_links, url_to_postid( $url ), $url ) ) {
+				$failed[] = __( 'This page already links to that destination, including its ACF blocks.', 'ai-internal-linking' );
 				continue;
 			}
 
@@ -73,6 +79,7 @@ class AIL_Linker {
 				$content = $result['content'];
 				++$applied;
 				$done[] = $item;
+				$existing_links[] = array( 'target_post_id' => url_to_postid( $url ), 'target_url' => $url );
 				continue;
 			}
 
@@ -89,6 +96,7 @@ class AIL_Linker {
 					$placed               = true;
 					++$applied;
 					$done[] = $item;
+					$existing_links[] = array( 'target_post_id' => url_to_postid( $url ), 'target_url' => $url );
 					break;
 				}
 			}
@@ -347,3 +355,4 @@ class AIL_Linker {
 		return true;
 	}
 }
+

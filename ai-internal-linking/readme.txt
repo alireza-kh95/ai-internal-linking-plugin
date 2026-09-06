@@ -5,7 +5,7 @@ Tags: internal linking, seo, ai, ollama, n8n
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -71,3 +71,4 @@ No, not by default. Settings includes an explicit "Delete all plugin tables and 
 
 = 1.0.0 =
 * Initial release: content index + delta sync, AI find-opportunities, safe link insertion, AI audit, modern dashboard, maintenance tools.
+

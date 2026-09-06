@@ -301,7 +301,16 @@ class AIL_REST {
 			: AIL_DB::get_opportunities( $post_id, 'suggested' );
 
 		$groups = array();
+		$existing_by_source = array();
 		foreach ( $rows as $r ) {
+			$sid = (int) $r['source_post_id'];
+			if ( ! isset( $existing_by_source[ $sid ] ) ) {
+				$source = get_post( $sid );
+				$existing_by_source[ $sid ] = $source ? AIL_Sync::extract_internal_links( $source ) : array();
+			}
+			if ( AIL_Sync::has_destination( $existing_by_source[ $sid ], (int) $r['target_post_id'], $r['target_url'] ) ) {
+				continue;
+			}
 			$key = $inbound
 				? $r['source_post_id'] . '|' . mb_strtolower( $r['anchor_text'] )
 				: mb_strtolower( $r['anchor_text'] );
@@ -633,3 +642,4 @@ class AIL_REST {
 		return $out;
 	}
 }
+
