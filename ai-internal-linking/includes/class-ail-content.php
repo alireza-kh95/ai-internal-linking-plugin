@@ -112,8 +112,7 @@ class AIL_Content {
 	}
 
 	/**
-	 * Top-level ACF WYSIWYG fields that can safely hold an HTML link.
-	 * Returns a map of field_key => [ name, html (raw stored value) ].
+	 * ACF WYSIWYG fields with exact paths into their raw root value.
 	 *
 	 * @param int $post_id Post id.
 	 * @return array
@@ -129,14 +128,67 @@ class AIL_Content {
 		}
 		$out = array();
 		foreach ( $objects as $name => $fo ) {
-			if ( isset( $fo['type'], $fo['value'], $fo['key'] ) && 'wysiwyg' === $fo['type'] && is_string( $fo['value'] ) && '' !== trim( $fo['value'] ) ) {
-				$out[ $fo['key'] ] = array(
-					'name' => $name,
-					'html' => $fo['value'],
-				);
+			if ( isset( $fo['key'], $fo['value'] ) ) {
+				self::collect_editors( $fo, $fo['value'], $fo['key'], array(), $out );
 			}
 		}
 		return $out;
+	}
+
+	private static function collect_editors( array $field, $value, $root, array $path, array &$out, $depth = 0 ) {
+		if ( $depth > 20 ) { return; }
+		$type = $field['type'] ?? '';
+		if ( 'wysiwyg' === $type && is_string( $value ) && '' !== trim( $value ) ) {
+			$out[ $root . ':' . json_encode( $path ) ] = array(
+				'name' => $field['name'], 'html' => $value, 'root_key' => $root, 'path' => $path,
+			);
+			return;
+		}
+		if ( ! is_array( $value ) ) { return; }
+		$rows = array();
+		if ( 'group' === $type ) {
+			$rows[] = array( $value, $path, $field['sub_fields'] ?? array() );
+		} elseif ( in_array( $type, array( 'repeater', 'flexible_content' ), true ) ) {
+			foreach ( $value as $index => $row ) {
+				if ( ! is_array( $row ) ) { continue; }
+				$children = $field['sub_fields'] ?? array();
+				if ( 'flexible_content' === $type ) {
+					$children = array();
+					foreach ( $field['layouts'] ?? array() as $layout ) {
+						if ( ( $layout['name'] ?? '' ) === ( $row['acf_fc_layout'] ?? null ) ) {
+							$children = $layout['sub_fields'] ?? array();
+							break;
+						}
+					}
+				}
+				$rows[] = array( $row, array_merge( $path, array( $index ) ), $children );
+			}
+		}
+		foreach ( $rows as $entry ) {
+			list( $row, $row_path, $children ) = $entry;
+			foreach ( $children as $child ) {
+				// Raw ACF values can use field keys or names, depending on field type.
+				$key = array_key_exists( $child['key'], $row ) ? $child['key'] : $child['name'];
+				if ( array_key_exists( $key, $row ) ) {
+					self::collect_editors( $child, $row[ $key ], $root, array_merge( $row_path, array( $key ) ), $out, $depth + 1 );
+				}
+			}
+		}
+	}
+
+	/** Re-read the root before changing one leaf so sibling edits are retained. */
+	public static function save_acf_editor( $post_id, array $field, $html ) {
+		if ( ! function_exists( 'get_field' ) || ! function_exists( 'update_field' ) ) { return false; }
+		$value = get_field( $field['root_key'], $post_id, false );
+		$leaf =& $value;
+		foreach ( $field['path'] as $key ) {
+			if ( ! is_array( $leaf ) || ! array_key_exists( $key, $leaf ) ) { return false; }
+			$leaf =& $leaf[ $key ];
+		}
+		if ( $leaf !== $field['html'] ) { return false; }
+		$leaf = $html;
+		unset( $leaf );
+		return (bool) update_field( $field['root_key'], $value, $post_id );
 	}
 
 	/** Collect nested ACF HTML and link values, including flexible-content cards. */

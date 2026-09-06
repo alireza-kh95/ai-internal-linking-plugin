@@ -50,7 +50,6 @@ class AIL_Linker {
 
 		$content     = $post->post_content;
 		$acf         = AIL_Content::acf_wysiwyg_fields( $post_id ); // key => [ name, html ]
-		$acf_changed = array();
 		$applied     = 0;
 		$failed      = array();
 		$done        = array();
@@ -91,8 +90,12 @@ class AIL_Linker {
 					$r2 = $this->insert_into_content( $field['html'], $orig, $anchor, $url );
 				}
 				if ( $r2['changed'] ) {
+					if ( ! AIL_Content::save_acf_editor( $post_id, $field, $r2['content'] ) ) {
+						$failed[] = __( 'The ACF field changed or could not be saved. Refresh the page and try again.', 'ai-internal-linking' );
+						$placed = true;
+						break;
+					}
 					$acf[ $key ]['html']  = $r2['content'];
-					$acf_changed[ $key ]  = true;
 					$placed               = true;
 					++$applied;
 					$done[] = $item;
@@ -121,13 +124,6 @@ class AIL_Linker {
 					)
 				);
 				add_action( 'save_post', array( AIL_Plugin::instance()->sync(), 'on_save_post' ), 20, 3 );
-			}
-
-			// Persist any changed ACF WYSIWYG fields.
-			if ( $acf_changed && function_exists( 'update_field' ) ) {
-				foreach ( array_keys( $acf_changed ) as $key ) {
-					update_field( $key, $acf[ $key ]['html'], $post_id );
-				}
 			}
 
 			// Record links, mark opportunities applied, refresh the index + counts.
@@ -342,7 +338,9 @@ class AIL_Linker {
 			foreach ( AIL_Content::acf_wysiwyg_fields( $row['source_post_id'] ) as $key => $field ) {
 				$fixed = preg_replace( $pattern, '$2', $field['html'], 1, $c2 );
 				if ( $c2 > 0 && null !== $fixed && function_exists( 'update_field' ) ) {
-					update_field( $key, $fixed, $row['source_post_id'] );
+					if ( ! AIL_Content::save_acf_editor( $row['source_post_id'], $field, $fixed ) ) {
+						return new WP_Error( 'ail_acf_save_failed', __( 'The ACF field changed or could not be saved. Refresh and try again.', 'ai-internal-linking' ) );
+					}
 					break;
 				}
 			}

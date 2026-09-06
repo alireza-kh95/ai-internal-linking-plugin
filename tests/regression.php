@@ -60,3 +60,40 @@ $release['assets'] = array();
 verify( ! AIL_Updater::parse_release( $release ), 'Release without installable archive must not be offered.' );
 echo "Passed 11 regression checks.\n";
 
+function get_field_objects( $id, $formatted ) {
+	return array( array( 'key' => 'field_blocks', 'name' => 'blocks', 'type' => 'flexible_content',
+		'value' => $GLOBALS['editor_value'],
+		'layouts' => array( array( 'name' => 'hero', 'sub_fields' => array(
+			array( 'key' => 'field_group', 'name' => 'group', 'type' => 'group', 'sub_fields' => array(
+				array( 'key' => 'field_body', 'name' => 'body', 'type' => 'wysiwyg' ),
+				array( 'key' => 'field_plain', 'name' => 'plain', 'type' => 'text' ),
+			) ),
+		) ) ),
+	) );
+}
+function get_field( $key, $id, $formatted ) { return $GLOBALS['editor_value']; }
+function update_field( $key, $value, $id ) { $GLOBALS['editor_value'] = $value; return true; }
+class AIL_Settings { public static function get( $key ) { return ''; } }
+require __DIR__ . '/../ai-internal-linking/includes/class-ail-linker.php';
+$phrase = 'route every call to the team you already have';
+$html = '<p>Give callers one free-to-call 0800 number and ' . $phrase . '.</p>';
+$GLOBALS['editor_value'] = array(
+	array( 'acf_fc_layout' => 'hero', 'field_group' => array( 'field_body' => $html, 'field_plain' => 'Preserve this' ) ),
+	array( 'acf_fc_layout' => 'hero', 'group' => array( 'body' => '<p>Second row</p>', 'plain' => 'Also preserve' ) ),
+);
+$editors = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
+verify( count( $editors ) === 2, 'Nested rich-text fields must be found; plain-text fields must not be edited.' );
+verify( $editors[0]['path'] === array( 0, 'field_group', 'field_body' ), 'Key-based values must retain exact path.' );
+verify( $editors[1]['path'] === array( 1, 'group', 'body' ), 'Name-based values must retain exact path.' );
+$insert = new ReflectionMethod( 'AIL_Linker', 'insert_into_content' );
+$insert->setAccessible( true );
+$result = $insert->invoke( new AIL_Linker(), $editors[0]['html'], $phrase, $phrase, 'https://example.com/routing' );
+verify( $result['changed'], 'Screenshot phrase must be linkable inside rich text.' );
+verify( AIL_Content::save_acf_editor( 1, $editors[0], $result['content'] ), 'Nested editor must save.' );
+verify( $GLOBALS['editor_value'][0]['field_group']['field_plain'] === 'Preserve this', 'Sibling field must be retained.' );
+verify( $GLOBALS['editor_value'][1]['group']['body'] === '<p>Second row</p>', 'Neighbouring row must be retained.' );
+verify( ! AIL_Content::save_acf_editor( 1, $editors[0], '<p>Stale write</p>' ), 'Stale editor must not overwrite a newer value.' );
+$updated = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
+verify( AIL_Content::save_acf_editor( 1, $updated[0], $html ), 'Undo must restore the exact nested field.' );
+echo "Passed 9 nested ACF editor checks.\n";
+
