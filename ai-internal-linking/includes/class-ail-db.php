@@ -241,7 +241,7 @@ class AIL_DB {
 
 		$inserted = 0;
 		foreach ( $opportunities as $o ) {
-			$wpdb->insert(
+			$saved = $wpdb->insert(
 				$table,
 				array(
 					'batch_id'         => $batch_id,
@@ -257,7 +257,9 @@ class AIL_DB {
 					'created_at'       => $now,
 				)
 			);
-			++$inserted;
+			if ( false !== $saved ) {
+				++$inserted;
+			}
 		}
 		return $inserted;
 	}
@@ -284,7 +286,7 @@ class AIL_DB {
 			if ( empty( $o['source_post_id'] ) ) {
 				continue;
 			}
-			$wpdb->insert(
+			$saved = $wpdb->insert(
 				$table,
 				array(
 					'batch_id'         => $batch_id,
@@ -300,7 +302,9 @@ class AIL_DB {
 					'created_at'       => $now,
 				)
 			);
-			++$inserted;
+			if ( false !== $saved ) {
+				++$inserted;
+			}
 		}
 		return $inserted;
 	}

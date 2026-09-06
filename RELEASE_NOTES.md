@@ -1,6 +1,6 @@
-Enforce dedicated-page precedence for inbound link suggestions.
+Prevent valid workflow suggestions from disappearing in WordPress.
 
-Inbound scans now send the workflow a catalogue of competing destinations. This lets it reject a link to a broad parent page when a dedicated page is a stronger match for the anchor, such as Broadband instead of Business Connectivity.
+The drawer no longer repeats an unreliable plain-text phrase check after a suggestion has already been validated. Existing-link and duplicate-destination checks remain active, and link placement is still validated before content is changed.
 
-Includes heading exclusion, strict multi-word anchors, product/audience matching and all ACF linking improvements from earlier releases.
+Database inserts are now counted accurately. If WordPress cannot store every accepted opportunity, the UI reports a database error instead of incorrectly showing no opportunities.
 
