@@ -3,7 +3,7 @@
  * Plugin Name:       AI Internal Linking
  * Plugin URI:        https://rankermind.com
  * Description:       AI-powered internal linking. Indexes all page content with delta sync, finds contextual internal-linking opportunities via an n8n + Ollama workflow, applies links safely, and audits your internal link structure against best practices.
- * Version:           1.3.4
+ * Version:           1.3.5
  * Update URI:        https://github.com/alireza-kh95/ai-internal-linking-plugin
  * Requires at least: 6.0
  * Requires PHP:      7.4
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /* -------------------------------------------------------------------------
  * Constants
  * ---------------------------------------------------------------------- */
-define( 'AIL_VERSION', '1.3.4' );
+define( 'AIL_VERSION', '1.3.5' );
 define( 'AIL_DB_VERSION', '1' );
 define( 'AIL_PLUGIN_FILE', __FILE__ );
 define( 'AIL_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

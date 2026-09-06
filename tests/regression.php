@@ -111,7 +111,15 @@ $updated = array_values( AIL_Content::acf_wysiwyg_fields( 1 ) );
 $GLOBALS['discard_update'] = true;
 verify( ! AIL_Content::save_acf_editor( 1, $updated[0], '<p>This must fail.</p>' ), 'A genuinely failed ACF write must remain an error.' );
 $GLOBALS['discard_update'] = false;
-echo "Passed 11 nested ACF editor checks.\n";
+$GLOBALS['editor_value'] = array(
+	array( 'acf_fc_layout' => 'hero', 'field_group' => array( 'field_body' => '<h3>ACF heading only</h3><p>ACF body phrase</p><a href="/linked">ACF linked phrase</a>', 'field_plain' => 'Plain text is not editable' ) ),
+);
+$post->post_content = '<h2>Post heading only</h2><p>Post body phrase</p><a href="/linked">Post linked phrase</a><button>Button phrase</button>';
+$linkable = AIL_Content::linkable_text( $post );
+verify( false !== strpos( $linkable, 'Post body phrase' ) && false !== strpos( $linkable, 'ACF body phrase' ), 'Linkable body text must include post and ACF rich text.' );
+verify( false === strpos( $linkable, 'heading only' ) && false === strpos( $linkable, 'linked phrase' ) && false === strpos( $linkable, 'Button phrase' ), 'Headings and other blocked contexts must not reach opportunity analysis.' );
+verify( false === strpos( $linkable, 'Plain text is not editable' ), 'Uneditable ACF plain-text fields must not reach opportunity analysis.' );
+echo "Passed 14 nested ACF and linkable-text checks.\n";
 
 define( 'MINUTE_IN_SECONDS', 60 );
 define( 'HOUR_IN_SECONDS', 3600 );

@@ -51,6 +51,31 @@ class AIL_Content {
 	}
 
 	/**
+	 * Text that can safely receive a link, excluding headings and other blocked HTML.
+	 *
+	 * Unlike the search index, this intentionally excludes plain-text ACF fields:
+	 * the linker can only update post content and ACF WYSIWYG fields.
+	 *
+	 * @param WP_Post $post Post object.
+	 * @return string
+	 */
+	public static function linkable_text( $post ) {
+		$parts = array( self::linkable_text_from_html( self::rendered_html( $post ) ) );
+		foreach ( self::acf_wysiwyg_fields( $post->ID ) as $field ) {
+			$parts[] = self::linkable_text_from_html( $field['html'] );
+		}
+		return trim( (string) preg_replace( '/\s+/u', ' ', implode( ' ', array_filter( $parts ) ) ) );
+	}
+
+	/** Convert HTML to text after removing elements where links cannot be inserted. */
+	private static function linkable_text_from_html( $html ) {
+		$blocked = 'a|h1|h2|h3|h4|h5|h6|button|code|pre|script|style|figcaption|label|textarea|cite';
+		$html = preg_replace( '#<(' . $blocked . ')\b[^>]*>.*?</\1>#is', ' ', (string) $html );
+		$text = html_entity_decode( wp_strip_all_tags( $html, true ), ENT_QUOTES, 'UTF-8' );
+		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
+	}
+
+	/**
 	 * Concatenated plain text from all of a post's ACF fields (recursive).
 	 * No-op when ACF is not active.
 	 *

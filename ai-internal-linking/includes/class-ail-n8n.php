@@ -36,6 +36,7 @@ class AIL_N8N {
 		$direction = 'inbound' === $direction ? 'inbound' : 'outbound';
 		$post = get_post( $post_id );
 		$existing_links = $post ? AIL_Sync::extract_internal_links( $post ) : array();
+		$linkable_text  = $post ? AIL_Content::linkable_text( $post ) : '';
 
 		$payload = array(
 			'action'    => 'find_opportunities',
@@ -46,7 +47,7 @@ class AIL_N8N {
 				'post_id' => (int) $post_id,
 				'title'   => $index['title'],
 				'url'     => $index['url'],
-				'content' => $index['content_text'],
+				'content' => $linkable_text,
 				'keywords' => json_decode( (string) $index['keywords'], true ) ?: array(),
 				'existing_links' => $existing_links,
 			),
@@ -70,7 +71,7 @@ class AIL_N8N {
 					'post_id' => (int) $c['post_id'],
 					'title'   => $c['title'],
 					'url'     => $c['url'],
-					'content' => $c['content'],
+					'content' => $candidate_post ? mb_substr( AIL_Content::linkable_text( $candidate_post ), 0, 2000 ) : '',
 					'existing_links' => $candidate_links,
 				);
 			}
@@ -103,7 +104,7 @@ class AIL_N8N {
 		if ( 'inbound' === $direction ) {
 			$opportunities = $this->normalise_inbound( $response, $payload['candidates'], $index );
 		} else {
-			$opportunities = $this->normalise_opportunities( $response, $payload['targets'], $index['content_text'], $existing_links );
+			$opportunities = $this->normalise_opportunities( $response, $payload['targets'], $linkable_text, $existing_links );
 		}
 		return array(
 			'opportunities' => $opportunities,

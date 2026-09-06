@@ -1,6 +1,6 @@
-Fix a false ACF save warning that could appear after a nested rich-text link was successfully inserted.
+Prevent heading text from appearing as an internal-link opportunity.
 
-The plugin now verifies the exact nested ACF value after saving. ACF's false return value is accepted only when the requested HTML was actually persisted; genuine write failures still produce an error.
+AI scans now receive only text that the plugin can actually link. Headings, existing links, buttons, code, captions and other blocked elements are removed from post content and nested ACF rich-text fields before analysis.
 
-Includes all existing-anchor suppression and nested ACF linking improvements from 1.3.3.
+Previously saved heading-only suggestions are also removed automatically when the opportunity drawer opens.
 

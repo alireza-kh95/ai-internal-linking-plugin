@@ -302,13 +302,15 @@ class AIL_REST {
 
 		$groups = array();
 		$existing_by_source = array();
+		$linkable_by_source = array();
 		foreach ( $rows as $r ) {
 			$sid = (int) $r['source_post_id'];
 			if ( ! isset( $existing_by_source[ $sid ] ) ) {
 				$source = get_post( $sid );
 				$existing_by_source[ $sid ] = $source ? AIL_Sync::extract_internal_links( $source ) : array();
+				$linkable_by_source[ $sid ] = $source ? AIL_Content::linkable_text( $source ) : '';
 			}
-			if ( AIL_Sync::has_destination( $existing_by_source[ $sid ], (int) $r['target_post_id'], $r['target_url'] ) || AIL_Sync::has_anchor( $existing_by_source[ $sid ], $r['anchor_text'] ) ) {
+			if ( false === mb_stripos( $linkable_by_source[ $sid ], $r['anchor_text'] ) || AIL_Sync::has_destination( $existing_by_source[ $sid ], (int) $r['target_post_id'], $r['target_url'] ) || AIL_Sync::has_anchor( $existing_by_source[ $sid ], $r['anchor_text'] ) ) {
 				AIL_DB::set_opportunity_status( (int) $r['id'], 'ignored' );
 				continue;
 			}
