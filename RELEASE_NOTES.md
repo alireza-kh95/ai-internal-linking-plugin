@@ -1,4 +1,4 @@
-Exclude CTA components from duplicate-destination audit findings.
+Apply internal links when an anchor phrase crosses inline formatting.
 
-Links inside the theme CTA component (`.cta-wrapper` and `.cta-section`) and CTA-labelled ACF fields now retain their component provenance. They remain part of the internal link graph and link counts, but do not cause duplicate-destination warnings when the same destination is linked contextually in the article body.
+Phrases such as `transformative <strong>benefits of IoT asset tracking</strong>` can now be linked as one continuous anchor. The linker safely wraps adjacent inline nodes under the same paragraph and preserves the existing bold or italic markup instead of flattening the text.
 

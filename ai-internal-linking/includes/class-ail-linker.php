@@ -221,16 +221,7 @@ class AIL_Linker {
 			$before = substr( $node->nodeValue, 0, $match['offset'] );
 			$after  = substr( $node->nodeValue, $match['offset'] + $match['length'] );
 
-			$anchor = $dom->createElement( 'a' );
-			$anchor->setAttribute( 'href', $url );
-			$rel = (string) AIL_Settings::get( 'link_rel' );
-			if ( $rel ) {
-				$anchor->setAttribute( 'rel', $rel );
-			}
-			if ( '_blank' === AIL_Settings::get( 'link_target' ) ) {
-				$anchor->setAttribute( 'target', '_blank' );
-			}
-			$anchor->setAttribute( 'data-ail', '1' );
+			$anchor = $this->create_anchor( $dom, $url );
 			$anchor->appendChild( $dom->createTextNode( $link_text ) );
 
 			$parent = $node->parentNode;
@@ -245,6 +236,9 @@ class AIL_Linker {
 
 			$changed = true;
 			break; // One link per call.
+		}
+		if ( ! $changed && $find_text === $link_text ) {
+			$changed = $this->insert_across_inline_nodes( $dom, $xpath, $wrapper, $find_text, $url );
 		}
 
 		if ( ! $changed ) {
@@ -263,6 +257,94 @@ class AIL_Linker {
 			'changed' => true,
 			'content' => $html,
 		);
+	}
+
+	/** Create a consistently configured internal-link element. */
+	private function create_anchor( $dom, $url ) {
+		$anchor = $dom->createElement( 'a' );
+		$anchor->setAttribute( 'href', $url );
+		$rel = (string) AIL_Settings::get( 'link_rel' );
+		if ( $rel ) {
+			$anchor->setAttribute( 'rel', $rel );
+		}
+		if ( '_blank' === AIL_Settings::get( 'link_target' ) ) {
+			$anchor->setAttribute( 'target', '_blank' );
+		}
+		$anchor->setAttribute( 'data-ail', '1' );
+		return $anchor;
+	}
+
+	/**
+	 * Link a phrase split by adjacent inline formatting, such as
+	 * "transformative <strong>benefits of IoT asset tracking</strong>".
+	 */
+	private function insert_across_inline_nodes( $dom, $xpath, $wrapper, $find_text, $url ) {
+		$containers = $xpath->query( './/p | .//li | .//td | .//dd | .//dt | .//blockquote', $wrapper );
+		foreach ( $containers as $container ) {
+			$text_nodes = array();
+			$plain      = '';
+			foreach ( $xpath->query( './/text()', $container ) as $node ) {
+				if ( $this->in_skipped_context( $node, $container ) ) {
+					continue;
+				}
+				$text_nodes[] = array( 'node' => $node, 'start' => strlen( $plain ), 'length' => strlen( $node->nodeValue ) );
+				$plain       .= $node->nodeValue;
+			}
+			$match = $this->locate( $plain, $find_text );
+			if ( null === $match ) {
+				continue;
+			}
+			$match_end = $match['offset'] + $match['length'];
+			$start     = null;
+			$end       = null;
+			foreach ( $text_nodes as $entry ) {
+				if ( null === $start && $match['offset'] >= $entry['start'] && $match['offset'] < $entry['start'] + $entry['length'] ) {
+					$start = $entry;
+				}
+				if ( $match_end > $entry['start'] && $match_end <= $entry['start'] + $entry['length'] ) {
+					$end = $entry;
+					break;
+				}
+			}
+			if ( ! $start || ! $end || $start['node'] === $end['node'] ) {
+				continue;
+			}
+
+			$start_top = $this->direct_child( $start['node'], $container );
+			$end_top   = $this->direct_child( $end['node'], $container );
+			if ( ! $start_top || ! $end_top || $start_top === $end_top ) {
+				continue;
+			}
+			$start_local = $match['offset'] - $start['start'];
+			$end_local   = $match_end - $end['start'];
+			// The formatted boundary must be wholly selected; this avoids broken or crossed markup.
+			if ( XML_TEXT_NODE !== $start_top->nodeType || $start_local >= strlen( $start_top->nodeValue ) || $end_local !== strlen( $end['node']->nodeValue ) || trim( $end_top->textContent ) !== trim( $end['node']->nodeValue ) ) {
+				continue;
+			}
+			$first = $start_local > 0 ? $start_top->splitText( $start_local ) : $start_top;
+			$anchor = $this->create_anchor( $dom, $url );
+			$container->insertBefore( $anchor, $first );
+			$current = $first;
+			while ( $current ) {
+				$next = $current->nextSibling;
+				$last = $current === $end_top;
+				$anchor->appendChild( $current );
+				if ( $last ) {
+					return true;
+				}
+				$current = $next;
+			}
+		}
+		return false;
+	}
+
+	/** Find the direct child of a block container that owns a text node. */
+	private function direct_child( $node, $container ) {
+		$current = $node;
+		while ( $current && $current->parentNode !== $container ) {
+			$current = $current->parentNode;
+		}
+		return $current && $current->parentNode === $container ? $current : null;
 	}
 
 	/**
