@@ -860,10 +860,19 @@
 
 		var list = res.issues.filter( function ( i ) { return auditFilter === 'all' || i.severity === auditFilter; } ).map( function ( i ) {
 			var m = sevMeta( i.severity );
-			var link = i.edit_link ? ' · <a href="' + attr( i.edit_link ) + '" target="_blank" rel="noopener">Edit page</a>' : '';
+			var data = i.data || {}, action = data.action || 'review';
+			var labels = { add_inbound: 'Add inbound links', add_outbound: 'Add outbound links', remove: 'Remove', replace: 'Replace', edit: 'Edit', review: 'Review', reconcile: 'Reconcile' };
+			var actions = '<span class="ail-badge badge-gray">' + esc( labels[ action ] || 'Review' ) + '</span>';
+			if ( ( action === 'add_inbound' || action === 'add_outbound' ) && i.post_id ) {
+				actions += '<button class="ail-btn ail-btn-sm" data-a-find="' + i.post_id + '" data-a-dir="' + ( action === 'add_inbound' ? 'inbound' : 'outbound' ) + '" data-a-title="' + attr( i.post_title || '' ) + '">' + I.sparkle + 'Find links</button>';
+			}
+			if ( action === 'remove' && data.managed && data.link_id ) {
+				actions += '<button class="ail-btn ail-btn-sm ail-btn-danger" data-a-remove="' + data.link_id + '">' + I.unlink + 'Remove</button>';
+			}
+			if ( i.edit_link ) { actions += '<a class="ail-btn ail-btn-sm" href="' + attr( i.edit_link ) + '" target="_blank" rel="noopener">' + I.ext + 'Edit page</a>'; }
 			return '<div class="ail-issue"><div class="ail-issue-ico ' + m.cls + '">' + m.icon + '</div>' +
 				'<div class="ail-issue-body"><h5>' + esc( i.title ) + '</h5><p>' + esc( i.message ) + '</p>' +
-				'<div class="ail-issue-meta ail-muted"><span class="ail-badge ' + m.badge + '">' + esc( i.issue_type.replace( /_/g, ' ' ) ) + '</span>' + link + '</div></div></div>';
+				'<div class="ail-issue-meta ail-muted"><span class="ail-badge ' + m.badge + '">' + esc( i.issue_type.replace( /_/g, ' ' ) ) + '</span>' + actions + '</div></div></div>';
 		} ).join( '' );
 
 		if ( ! list ) { list = '<div class="ail-empty" style="padding:40px"><div class="ail-empty-ico">' + I.check + '</div><h4>Nothing here</h4><p>No ' + esc( auditFilter ) + ' issues found.</p></div>'; }
@@ -871,6 +880,12 @@
 		body.innerHTML = top + tabs + '<div class="ail-table-wrap">' + list + '</div>';
 		qsa( '.ail-sev-tab' ).forEach( function ( t ) {
 			t.addEventListener( 'click', function () { auditFilter = t.getAttribute( 'data-sev' ); renderAudit( res ); } );
+		} );
+		qsa( '[data-a-find]' ).forEach( function ( b ) {
+			b.addEventListener( 'click', function () { openOppDrawer( parseInt( b.getAttribute( 'data-a-find' ), 10 ), b.getAttribute( 'data-a-title' ), { run: true, direction: b.getAttribute( 'data-a-dir' ) } ); } );
+		} );
+		qsa( '[data-a-remove]' ).forEach( function ( b ) {
+			b.addEventListener( 'click', function () { confirmModal( { title: 'Remove this link?', message: 'The text will remain and only the plugin-applied link will be removed.', confirm: 'Remove link', danger: true } ).then( function ( ok ) { if ( ! ok ) { return; } api( '/links/remove', { method: 'POST', body: { id: parseInt( b.getAttribute( 'data-a-remove' ), 10 ) } } ).then( function () { toast( 'Link removed.', 'ok' ); runAudit(); } ).catch( function ( e ) { toast( e.message, 'err' ); } ); } ); } );
 		} );
 	}
 	function tabBtn( sev, label, count ) {

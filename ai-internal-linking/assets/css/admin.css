@@ -320,7 +320,7 @@ button.ail-btn.ail-btn-sm.ail-btn-primary { margin: 1em 0; }
 .ail-issue-ico svg { width: 16px; height: 16px; }
 .ail-issue-body h5 { margin: 0 0 3px; font-size: 13.5px; font-weight: 680; }
 .ail-issue-body p { margin: 0; font-size: 12.5px; color: var(--ail-text-soft); line-height: 1.55; }
-.ail-issue-body .ail-issue-meta { margin-top: 6px; font-size: 11.5px; }
+.ail-issue-body .ail-issue-meta { margin-top: 9px; font-size: 11.5px; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .ail-sev-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
 .ail-sev-tab { border: 1px solid var(--ail-border-strong); background: var(--ail-surface); border-radius: 999px; padding: 6px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--ail-text-soft); font-family: inherit; display: inline-flex; align-items: center; gap: 7px; }
 .ail-sev-tab.is-active { background: var(--ail-text); color: #fff; border-color: var(--ail-text); }

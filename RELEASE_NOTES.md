@@ -1,6 +1,6 @@
-Add site-wide internal-link opportunity discovery and review.
+Make the audit comprehensive, actionable and consistent with the plugin's own recommendations.
 
-The new Opportunities screen scans every synced, published page in a controlled sequential queue. It shows the current page, progress, opportunity count and failures, and lets administrators stop without losing results already saved.
+The audit now refreshes the live link graph and checks crawl depth, orphan and weakly supported pages, dead ends, duplicate destinations, unresolved or unpublished targets, self-links, generic and overlong manual anchors, internal nofollow attributes, excessive density and applied-link record drift.
 
-All open suggestions are collected into one review queue showing the source page, phrase, context, destination, confidence and reason. Administrators can edit phrases, select opportunities across multiple pages and apply them together. Existing links are rechecked before suggestions appear.
+Findings carry clear add, edit, replace, remove, review or reconcile actions. Administrators can launch inbound or outbound discovery directly from relevant findings, open the affected page, or safely remove a plugin-managed link. Links previously approved by the plugin are excluded from subjective anchor criticism but remain subject to objective integrity checks if content or destinations change.
 

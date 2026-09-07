@@ -50,6 +50,11 @@ verify( ! AIL_Sync::has_destination( $links, 0, 'https://example.com/other?varia
 verify( AIL_Sync::has_anchor( $links, "  READ\n more " ), 'Existing anchors must match case-insensitively across whitespace.' );
 verify( ! AIL_Sync::has_anchor( $links, 'route every call' ), 'Different anchors must remain eligible.' );
 
+$auditor_source = file_get_contents( __DIR__ . '/../ai-internal-linking/includes/class-ail-auditor.php' );
+verify( false !== strpos( $auditor_source, "'managed' => \$is_managed" ), 'Audit findings must retain plugin-managed link provenance.' );
+verify( false !== strpos( $auditor_source, 'crawl_depths' ), 'Audit must evaluate homepage crawl depth.' );
+verify( false !== strpos( $auditor_source, "'reporting_rules'" ), 'AI audit summaries must receive anti-conflict reporting rules.' );
+
 $release = array( 'tag_name' => 'v1.3.3', 'draft' => false, 'prerelease' => false, 'body' => 'Changes', 'assets' => array( array(
 	'name' => 'ai-internal-linking.zip', 'state' => 'uploaded',
 	'browser_download_url' => 'https://github.com/alireza-kh95/ai-internal-linking-plugin/releases/download/v1.3.3/ai-internal-linking.zip',

@@ -533,13 +533,17 @@ class AIL_REST {
 	 * @return WP_REST_Response
 	 */
 	public function get_audit() {
-		$run_id = AIL_DB::latest_audit_run();
 		$last   = get_option( 'ail_last_audit', array() );
+		$run_id = AIL_DB::latest_audit_run();
+		if ( ! $run_id && ! empty( $last['run_id'] ) ) {
+			$run_id = (string) $last['run_id'];
+		}
 		$issues = $run_id ? AIL_DB::get_audit_issues( $run_id ) : array();
 		foreach ( $issues as &$i ) {
 			$i['data'] = $i['data'] ? json_decode( $i['data'], true ) : null;
 			if ( $i['post_id'] ) {
 				$i['edit_link'] = get_edit_post_link( (int) $i['post_id'], 'raw' );
+				$i['post_title'] = get_the_title( (int) $i['post_id'] );
 			}
 		}
 		unset( $i );

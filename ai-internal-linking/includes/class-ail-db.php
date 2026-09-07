@@ -439,6 +439,15 @@ class AIL_DB {
 		return $rows ?: array();
 	}
 
+	/** Return every active link recorded as applied by this plugin. */
+	public static function get_active_links( $limit = 5000 ) {
+		global $wpdb;
+		$table = self::table( 'links' );
+		$limit = max( 1, min( 10000, (int) $limit ) );
+		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status = 'active' ORDER BY applied_at DESC LIMIT %d", $limit ), ARRAY_A ); // phpcs:ignore WordPress.DB
+		return $rows ?: array();
+	}
+
 	/**
 	 * Mark a link as removed.
 	 *

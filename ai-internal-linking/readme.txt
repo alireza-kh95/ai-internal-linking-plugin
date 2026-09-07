@@ -5,7 +5,7 @@ Tags: internal linking, seo, ai, ollama, n8n
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,11 @@ Whatever Ollama model you select in Settings. It can use self-hosted Ollama mode
 No, not by default. Settings includes an explicit "Delete all plugin tables and settings on uninstall" checkbox for intentionally destructive uninstall cleanup.
 
 == Changelog ==
+
+= 1.5.0 =
+* Expanded auditing across crawl depth, dead ends, weak inbound support, duplicate destinations, target validity, anchor quality, internal nofollow and applied-link record drift.
+* Added contextual audit actions for finding links, editing pages and safely removing plugin-applied links.
+* Protected plugin-approved links from subjective audit criticism while retaining objective integrity checks.
 
 = 1.4.0 =
 * Added a site-wide opportunity scan with live progress, stop control, failure tracking and a combined bulk review/apply queue.

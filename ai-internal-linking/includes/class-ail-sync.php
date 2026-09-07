@@ -329,6 +329,9 @@ class AIL_Sync {
 				'target_post_id' => (int) $target_id,
 				'target_url'     => $href,
 				'anchor_text'    => $anchor,
+				'rel'            => trim( $element->getAttribute( 'rel' ) ),
+				'target'         => trim( $element->getAttribute( 'target' ) ),
+				'managed_markup' => '1' === $element->getAttribute( 'data-ail' ),
 			);
 		}
 		return $result;
