@@ -5,7 +5,7 @@ Tags: internal linking, seo, ai, ollama, n8n
 Requires at least: 6.0
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 1.5.1
+Stable tag: 1.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,9 @@ Whatever Ollama model you select in Settings. It can use self-hosted Ollama mode
 No, not by default. Settings includes an explicit "Delete all plugin tables and settings on uninstall" checkbox for intentionally destructive uninstall cleanup.
 
 == Changelog ==
+
+= 1.5.2 =
+* Excluded theme and ACF CTA component links from duplicate-destination findings while retaining them in the site link graph.
 
 = 1.5.1 =
 * Account for active WordPress navigation menus and listing paths when estimating click depth and inbound discoverability.

@@ -329,6 +329,12 @@ class AIL_Sync {
 				continue; // External link.
 			}
 			$target_id = url_to_postid( $href );
+			$is_cta    = '1' === $element->getAttribute( 'data-ail-cta' );
+			$ancestor  = $element->parentNode;
+			while ( ! $is_cta && $ancestor && XML_ELEMENT_NODE === $ancestor->nodeType ) {
+				$is_cta   = '1' === $ancestor->getAttribute( 'data-ail-cta' ) || preg_match( '/(?:^|\s)(?:cta-wrapper|cta-section)(?:\s|$)/i', $ancestor->getAttribute( 'class' ) );
+				$ancestor = $ancestor->parentNode;
+			}
 			$result[]  = array(
 				'target_post_id' => (int) $target_id,
 				'target_url'     => $href,
@@ -336,6 +342,7 @@ class AIL_Sync {
 				'rel'            => trim( $element->getAttribute( 'rel' ) ),
 				'target'         => trim( $element->getAttribute( 'target' ) ),
 				'managed_markup' => '1' === $element->getAttribute( 'data-ail' ),
+				'is_cta'         => (bool) $is_cta,
 			);
 		}
 		return $result;

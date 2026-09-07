@@ -37,11 +37,14 @@ $GLOBALS['acf_fixture'] = array( 'blocks' => array( array(
 		array( 'button' => array( 'url' => 'https://example.com/other', 'title' => 'Read more', 'target' => '' ) ),
 		array( 'body' => '<p><a href="https://example.com/nested">Nested</a></p>' ),
 	) ),
-) ) );
+) ), 'cta_section' => array(
+	'button' => array( 'url' => 'https://example.com/contact', 'title' => 'Contact us' ),
+) );
 $post = new WP_Post();
 $post->post_content = '<p><a href = "https://example.com/body">Body</a><a href="https://example.com/source/#how-it-works">How it works</a><a href="//elsewhere.com/no">External</a></p>';
 $links = AIL_Sync::extract_internal_links( $post );
-verify( count( $links ) === 4, 'Body and all nested ACF links must be included, excluding images, external URLs and same-page section anchors.' );
+verify( count( $links ) === 5, 'Body and all nested ACF links must be included, excluding images, external URLs and same-page section anchors.' );
+verify( count( array_filter( $links, function ( $link ) { return ! empty( $link['is_cta'] ); } ) ) === 1, 'Links inside CTA-labelled ACF fields must retain CTA provenance.' );
 verify( AIL_Sync::has_destination( $links, 2, 'https://example.com/alias' ), 'Post ID must match aliases.' );
 verify( AIL_Sync::has_destination( $links, 0, 'https://example.com/other/#section' ), 'Fragments and trailing slashes must not bypass duplicate detection.' );
 verify( ! AIL_Sync::has_destination( $links, 0, 'https://example.com/new' ), 'New destinations must remain eligible.' );

@@ -234,33 +234,37 @@ class AIL_Content {
 		return implode( "\n", $parts );
 	}
 
-	private static function collect_link_html( $value, array &$parts, $key = '', $depth = 0 ) {
+	private static function collect_link_html( $value, array &$parts, $key = '', $depth = 0, $in_cta = false ) {
 		if ( $depth > 20 ) {
 			return;
 		}
+		$in_cta = $in_cta || (bool) preg_match( '/(?:^|_)(?:cta|call_to_action)(?:_|$)/i', $key );
 		if ( $value instanceof WP_Post ) {
 			if ( 'attachment' !== $value->post_type ) {
-				$parts[] = '<a href="' . esc_url( get_permalink( $value ) ) . '">' . esc_html( get_the_title( $value ) ) . '</a>';
+				$parts[] = '<a' . ( $in_cta ? ' data-ail-cta="1"' : '' ) . ' href="' . esc_url( get_permalink( $value ) ) . '">' . esc_html( get_the_title( $value ) ) . '</a>';
 			}
 			return;
 		}
 		if ( is_array( $value ) ) {
+			if ( ! empty( $value['acf_fc_layout'] ) && preg_match( '/(?:cta|call_to_action)/i', (string) $value['acf_fc_layout'] ) ) {
+				$in_cta = true;
+			}
 			// Media URLs are assets, not links rendered by the page.
 			if ( isset( $value['mime_type'] ) || isset( $value['sizes'], $value['url'] ) ) {
 				return;
 			}
 			if ( isset( $value['url'], $value['title'] ) && is_string( $value['url'] ) ) {
-				$parts[] = '<a href="' . esc_url( $value['url'] ) . '">' . esc_html( $value['title'] ) . '</a>';
+				$parts[] = '<a' . ( $in_cta ? ' data-ail-cta="1"' : '' ) . ' href="' . esc_url( $value['url'] ) . '">' . esc_html( $value['title'] ) . '</a>';
 				return;
 			}
 			foreach ( $value as $child_key => $child ) {
-				self::collect_link_html( $child, $parts, (string) $child_key, $depth + 1 );
+				self::collect_link_html( $child, $parts, (string) $child_key, $depth + 1, $in_cta );
 			}
 		} elseif ( is_string( $value ) ) {
 			if ( false !== stripos( $value, '<a' ) ) {
-				$parts[] = $value;
+				$parts[] = $in_cta ? '<div data-ail-cta="1">' . $value . '</div>' : $value;
 			} elseif ( preg_match( '/(?:url|link|href|permalink)/i', $key ) && ! preg_match( '/(?:image|icon|file|thumbnail)/i', $key ) ) {
-				$parts[] = '<a href="' . esc_url( trim( $value ) ) . '"></a>';
+				$parts[] = '<a' . ( $in_cta ? ' data-ail-cta="1"' : '' ) . ' href="' . esc_url( trim( $value ) ) . '"></a>';
 			}
 		}
 	}

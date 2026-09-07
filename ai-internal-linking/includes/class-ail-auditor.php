@@ -53,10 +53,13 @@ class AIL_Auditor {
 					$graph[ $pid ][ $tid ] = true;
 				}
 
-				if ( isset( $destinations[ $dest_key ] ) && ! $this->is_repeatable_utility_destination( $link, $by_id ) ) {
+				$is_cta_link = ! empty( $link['is_cta'] );
+				if ( ! $is_cta_link && ! empty( $destinations[ $dest_key ] ) && ! $this->is_repeatable_utility_destination( $link, $by_id ) ) {
 					$issues[] = $this->issue( $pid, 'duplicate_destination', 'warning', 'Page links to the same destination more than once', sprintf( '“%1$s” links to %2$s multiple times. Keep the most useful contextual link and remove redundant repeats.', $page['title'], $link['target_url'] ), 'remove', array( 'anchor' => $anchor, 'url' => $link['target_url'], 'managed' => $is_managed, 'link_id' => $record ? (int) $record['id'] : 0 ) );
-			}
-			$destinations[ $dest_key ] = true;
+				}
+				if ( ! $is_cta_link ) {
+					$destinations[ $dest_key ] = isset( $destinations[ $dest_key ] ) ? $destinations[ $dest_key ] + 1 : 1;
+				}
 
 			if ( $tid === $pid ) {
 				$issues[] = $this->issue( $pid, 'self_link', 'warning', 'Page links to itself', sprintf( '“%1$s” contains a self-link using “%2$s”. Remove it unless it intentionally points to a section anchor.', $page['title'], $anchor ), 'remove', array( 'anchor' => $anchor, 'url' => $link['target_url'], 'managed' => $is_managed, 'link_id' => $record ? (int) $record['id'] : 0 ) );
