@@ -13,7 +13,7 @@ class AIL_Auditor {
 		AIL_Plugin::instance()->sync()->update_link_counts();
 
 		$index = AIL_DB::table( 'index' );
-		$pages = $wpdb->get_results( "SELECT post_id, title, url, word_count, inbound_count, outbound_count FROM {$index} WHERE post_status = 'publish'", ARRAY_A ); // phpcs:ignore WordPress.DB
+		$pages = $wpdb->get_results( "SELECT post_id, post_type, title, url, word_count, inbound_count, outbound_count FROM {$index} WHERE post_status = 'publish'", ARRAY_A ); // phpcs:ignore WordPress.DB
 		$by_id = array();
 		foreach ( $pages as $page ) {
 			$by_id[ (int) $page['post_id'] ] = $page;
@@ -25,6 +25,7 @@ class AIL_Auditor {
 		$anchor_targets = array();
 		$issues        = array();
 		$front_id      = (int) get_option( 'page_on_front' );
+		$navigation    = $this->navigation_routes( $pages );
 		$generic       = array( 'click here', 'learn more', 'read more', 'more', 'here', 'this page', 'find out more', 'view more', 'discover more' );
 
 		foreach ( $pages as $page ) {
@@ -52,7 +53,7 @@ class AIL_Auditor {
 					$graph[ $pid ][ $tid ] = true;
 				}
 
-				if ( isset( $destinations[ $dest_key ] ) ) {
+				if ( isset( $destinations[ $dest_key ] ) && ! $this->is_repeatable_utility_destination( $link, $by_id ) ) {
 					$issues[] = $this->issue( $pid, 'duplicate_destination', 'warning', 'Page links to the same destination more than once', sprintf( '“%1$s” links to %2$s multiple times. Keep the most useful contextual link and remove redundant repeats.', $page['title'], $link['target_url'] ), 'remove', array( 'anchor' => $anchor, 'url' => $link['target_url'], 'managed' => $is_managed, 'link_id' => $record ? (int) $record['id'] : 0 ) );
 			}
 			$destinations[ $dest_key ] = true;
@@ -79,9 +80,10 @@ class AIL_Auditor {
 			}
 		}
 
-			if ( 0 === (int) $page['inbound_count'] && $pid !== $front_id ) {
+			$effective_inbound = (int) $page['inbound_count'] + ( isset( $navigation['reachable'][ $pid ] ) ? 1 : 0 );
+			if ( 0 === $effective_inbound && $pid !== $front_id ) {
 				$issues[] = $this->issue( $pid, 'orphan', 'critical', 'No internal links point to this page', sprintf( '“%s” is disconnected from the site’s internal link graph. Find relevant pages that can link to it.', $page['title'] ), 'add_inbound', array( 'url' => $page['url'] ) );
-			} elseif ( (int) $page['word_count'] >= 300 && (int) $page['inbound_count'] === 1 && $pid !== $front_id ) {
+			} elseif ( (int) $page['word_count'] >= 300 && 1 === $effective_inbound && $pid !== $front_id ) {
 				$issues[] = $this->issue( $pid, 'weak_inbound_support', 'info', 'Page has only one inbound internal link', sprintf( '“%s” has substantial content but only one page links to it. Review additional relevant inbound opportunities.', $page['title'] ), 'add_inbound', array( 'url' => $page['url'] ) );
 			}
 			if ( (int) $page['word_count'] >= 250 && 0 === (int) $page['outbound_count'] ) {
@@ -107,7 +109,7 @@ class AIL_Auditor {
 			}
 		}
 
-		$depths = $this->crawl_depths( $graph, $front_id );
+		$depths = $this->crawl_depths( $graph, $front_id, $navigation );
 		foreach ( $depths as $pid => $depth ) {
 			if ( $depth > 3 && isset( $by_id[ $pid ] ) ) {
 				$issues[] = $this->issue( $pid, 'deep_page', 'info', 'Page is more than three clicks from the homepage', sprintf( '“%1$s” is approximately %2$d internal-link steps from the homepage. Consider a relevant link from a stronger hub or category page.', $by_id[ $pid ]['title'], $depth ), 'add_inbound', array( 'depth' => $depth ) );
@@ -144,12 +146,77 @@ class AIL_Auditor {
 		return mb_strtolower( trim( (string) preg_replace( '/\s+/u', ' ', wp_strip_all_tags( html_entity_decode( (string) $anchor, ENT_QUOTES, 'UTF-8' ) ) ) ), 'UTF-8' );
 	}
 
-	private function crawl_depths( array $graph, $front_id ) {
+	/** Collect active WordPress menu destinations and archive-like path routes. */
+	private function navigation_routes( array $pages ) {
+		$ids        = array();
+		$prefixes   = array();
+		$page_by_url = array();
+		foreach ( $pages as $page ) {
+			$page_by_url[ AIL_Sync::destination_key( $page['url'] ) ] = (int) $page['post_id'];
+		}
+		$posts_page = (int) get_option( 'page_for_posts' );
+		if ( function_exists( 'get_nav_menu_locations' ) && function_exists( 'wp_get_nav_menu_items' ) ) {
+			foreach ( array_unique( array_values( (array) get_nav_menu_locations() ) ) as $menu_id ) {
+				foreach ( (array) wp_get_nav_menu_items( $menu_id ) as $item ) {
+					if ( empty( $item->url ) ) {
+						continue;
+					}
+					$key = AIL_Sync::destination_key( $item->url );
+					if ( isset( $page_by_url[ $key ] ) ) {
+						$ids[ $page_by_url[ $key ] ] = true;
+					}
+					if ( ! empty( $item->object_id ) && 'custom' !== $item->type ) {
+						$ids[ (int) $item->object_id ] = true;
+					}
+					$path = trim( (string) wp_parse_url( $item->url, PHP_URL_PATH ), '/' );
+					$is_listing = 'post_type_archive' === $item->type || ( $posts_page && (int) $item->object_id === $posts_page ) || ( '' !== $path && ! isset( $page_by_url[ $key ] ) && empty( $item->object_id ) );
+					if ( $is_listing && '' !== $key ) {
+						$prefixes[] = rtrim( $key, '/' ) . '/';
+					}
+				}
+			}
+		}
+		$reachable = $ids;
+		foreach ( $pages as $page ) {
+			$page_key = rtrim( AIL_Sync::destination_key( $page['url'] ), '/' ) . '/';
+			foreach ( $prefixes as $menu_url ) {
+				if ( $page_key === $menu_url || ( strlen( $page_key ) > strlen( $menu_url ) && 0 === strpos( $page_key, $menu_url ) ) ) {
+					$reachable[ (int) $page['post_id'] ] = true;
+					break;
+				}
+			}
+		}
+		return array( 'ids' => $ids, 'prefixes' => array_unique( $prefixes ), 'reachable' => $reachable );
+	}
+
+	/** Contact and similar conversion destinations may intentionally be linked repeatedly. */
+	private function is_repeatable_utility_destination( array $link, array $pages ) {
+		$title = '';
+		if ( ! empty( $link['target_post_id'] ) && isset( $pages[ (int) $link['target_post_id'] ] ) ) {
+			$title = mb_strtolower( (string) $pages[ (int) $link['target_post_id'] ]['title'] );
+		}
+		$path = mb_strtolower( (string) wp_parse_url( $link['target_url'], PHP_URL_PATH ) );
+		return (bool) preg_match( '#(?:^|/)(contact|contact-us|book-a-demo|get-a-quote)/?$#', trim( $path, '/' ) ) || in_array( trim( $title ), array( 'contact', 'contact us', 'book a demo', 'get a quote' ), true );
+	}
+
+	private function crawl_depths( array $graph, $front_id, array $navigation ) {
 		if ( ! $front_id || ! isset( $graph[ $front_id ] ) ) {
 			return array();
 		}
 		$depths = array( $front_id => 0 );
 		$queue  = array( $front_id );
+		foreach ( array_keys( $navigation['ids'] ) as $menu_target ) {
+			if ( $menu_target !== $front_id ) {
+				$depths[ $menu_target ] = 1;
+				$queue[] = $menu_target;
+			}
+		}
+		foreach ( array_keys( $navigation['reachable'] ) as $listed_target ) {
+			if ( ! isset( $depths[ $listed_target ] ) ) {
+				$depths[ $listed_target ] = 2;
+				$queue[] = $listed_target;
+			}
+		}
 		while ( $queue ) {
 			$source = array_shift( $queue );
 			foreach ( array_keys( $graph[ $source ] ?? array() ) as $target ) {

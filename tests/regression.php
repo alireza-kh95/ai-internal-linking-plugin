@@ -39,9 +39,9 @@ $GLOBALS['acf_fixture'] = array( 'blocks' => array( array(
 	) ),
 ) ) );
 $post = new WP_Post();
-$post->post_content = '<p><a href = "https://example.com/body">Body</a><a href="//elsewhere.com/no">External</a></p>';
+$post->post_content = '<p><a href = "https://example.com/body">Body</a><a href="https://example.com/source/#how-it-works">How it works</a><a href="//elsewhere.com/no">External</a></p>';
 $links = AIL_Sync::extract_internal_links( $post );
-verify( count( $links ) === 4, 'Body and all nested ACF links must be included, excluding images and external URLs.' );
+verify( count( $links ) === 4, 'Body and all nested ACF links must be included, excluding images, external URLs and same-page section anchors.' );
 verify( AIL_Sync::has_destination( $links, 2, 'https://example.com/alias' ), 'Post ID must match aliases.' );
 verify( AIL_Sync::has_destination( $links, 0, 'https://example.com/other/#section' ), 'Fragments and trailing slashes must not bypass duplicate detection.' );
 verify( ! AIL_Sync::has_destination( $links, 0, 'https://example.com/new' ), 'New destinations must remain eligible.' );
@@ -53,6 +53,8 @@ verify( ! AIL_Sync::has_anchor( $links, 'route every call' ), 'Different anchors
 $auditor_source = file_get_contents( __DIR__ . '/../ai-internal-linking/includes/class-ail-auditor.php' );
 verify( false !== strpos( $auditor_source, "'managed' => \$is_managed" ), 'Audit findings must retain plugin-managed link provenance.' );
 verify( false !== strpos( $auditor_source, 'crawl_depths' ), 'Audit must evaluate homepage crawl depth.' );
+verify( false !== strpos( $auditor_source, 'navigation_routes' ), 'Audit crawl depth must account for active WordPress menus.' );
+verify( false !== strpos( $auditor_source, 'is_repeatable_utility_destination' ), 'Audit must permit repeated links to conversion utility pages.' );
 verify( false !== strpos( $auditor_source, "'reporting_rules'" ), 'AI audit summaries must receive anti-conflict reporting rules.' );
 
 $release = array( 'tag_name' => 'v1.3.3', 'draft' => false, 'prerelease' => false, 'body' => 'Changes', 'assets' => array( array(

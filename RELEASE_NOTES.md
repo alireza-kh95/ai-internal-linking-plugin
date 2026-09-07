@@ -1,6 +1,6 @@
-Make the audit comprehensive, actionable and consistent with the plugin's own recommendations.
+Correct false-positive audit findings around navigation, section links and conversion pages.
 
-The audit now refreshes the live link graph and checks crawl depth, orphan and weakly supported pages, dead ends, duplicate destinations, unresolved or unpublished targets, self-links, generic and overlong manual anchors, internal nofollow attributes, excessive density and applied-link record drift.
+Click-depth and inbound-discoverability calculations now account for active WordPress menus. Direct menu destinations count as one click, while content beneath a menu-linked blog or archive listing counts as two clicks.
 
-Findings carry clear add, edit, replace, remove, review or reconcile actions. Administrators can launch inbound or outbound discovery directly from relevant findings, open the affected page, or safely remove a plugin-managed link. Links previously approved by the plugin are excluded from subjective anchor criticism but remain subject to objective integrity checks if content or destinations change.
+Full same-page URLs with fragments, such as a How It Works button, are treated as section navigation instead of self-links. Repeated links to Contact Us, Book a Demo and Get a Quote destinations are accepted as intentional conversion paths rather than duplicate-link problems.
 

@@ -320,6 +320,10 @@ class AIL_Sync {
 			if ( ! in_array( strtolower( (string) wp_parse_url( $href, PHP_URL_SCHEME ) ), array( 'http', 'https' ), true ) ) {
 				continue;
 			}
+			// Same-page fragments are section navigation, not internal links between pages.
+			if ( wp_parse_url( $href, PHP_URL_FRAGMENT ) && self::destination_key( $href ) === self::destination_key( get_permalink( $post ) ) ) {
+				continue;
+			}
 			$link_host = wp_parse_url( $href, PHP_URL_HOST );
 			if ( $link_host && $host && strtolower( $link_host ) !== strtolower( $host ) ) {
 				continue; // External link.
